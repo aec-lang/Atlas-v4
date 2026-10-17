@@ -322,7 +322,120 @@ const tools = {
   },
 };
 
+/* ═════════ ترمینال تعاملی — نشست شل واقعی ═════════
+ * این ترمینالِ خودِ کاربر است (مثل GNOME Terminal): دستورها را خودِ کاربر
+ * تایپ می‌کند، پس تأیید تکراری لازم ندارد. ابزار shell_exec (مسیر عامل
+ * هوشمند) همچنان دریچهٔ تأیید خودش را دارد و دست نخورده است.
+ */
+const termSessions = new Map(); // id -> { proc, wc }
+let termSeq = 0;
+
+// نویز راه‌اندازی bash تعاملی وقتی tty واقعی ندارد
+const TERM_NOISE = [
+  /^bash: cannot set terminal process group.*$/,
+  /^bash: no job control in this shell.*$/,
+];
+
+function termSend(wc, id, data) {
+  try {
+    if (wc && !wc.isDestroyed()) wc.send("atlas:term-data", { id, data: String(data) });
+  } catch { /* ignore */ }
+}
+
+function registerTerminal() {
+  ipcMain.handle("atlas:term-start", (event) => {
+    const wc = event.sender;
+    const isWin = process.platform === "win32";
+    // ویندوز شل یونیکسی ندارد؛ از COMSPEC (معمولاً cmd.exe) استفاده می‌کنیم
+    const shellPath = isWin
+      ? (process.env.COMSPEC && process.env.COMSPEC.trim()
+          ? process.env.COMSPEC.trim()
+          : "C:\\Windows\\System32\\cmd.exe")
+      : (process.env.SHELL && process.env.SHELL.trim() ? process.env.SHELL.trim() : "/bin/bash");
+    const shellBase = path.basename(shellPath).toLowerCase();
+    const args = isWin
+      ? [] // cmd.exe/powershell با stdin پایپ‌شده تعاملی کار می‌کند؛ آرگومان لازم نیست
+      : (shellBase === "bash" ? ["--noprofile", "--norc", "-i"] : ["-i"]);
+    let proc;
+    try {
+      proc = spawn(shellPath, args, {
+        cwd: os.homedir(),
+        // detached: نشست، رهبر گروه فرآیند خودش است تا Ctrl+C به کل گروه
+        // پیش‌زمینه (شل + دستور در حال اجرا) برسد — مثل ترمینال واقعی
+        detached: true,
+        env: {
+          ...process.env,
+          TERM: "xterm-256color",
+          // پرامپت خوانا؛ کدهای رنگی را رندرر تفسیر می‌کند
+          PS1: "\\[\\e[1;32m\\]\\u@\\h\\[\\e[0m\\]:\\[\\e[1;34m\\]\\w\\[\\e[0m\\]\\$ ",
+        },
+        windowsHide: true,
+      });
+    } catch (e) {
+      return { ok: false, error: e && e.message ? e.message : String(e) };
+    }
+    const id = `term_${Date.now().toString(36)}_${++termSeq}`;
+    termSessions.set(id, { proc, wc });
+
+    const onData = (chunk) => {
+      let s = chunk.toString("utf8");
+      s = s
+        .split("\n")
+        .filter((ln) => !TERM_NOISE.some((re) => re.test(ln.trim())))
+        .join("\n");
+      if (s) termSend(wc, id, s);
+    };
+    proc.stdout.on("data", onData);
+    proc.stderr.on("data", onData);
+    proc.on("error", (e) => {
+      termSend(wc, id, `\r\n[خطا در اجرای شل: ${e.message}]\r\n`);
+    });
+    proc.on("close", (code) => {
+      termSessions.delete(id);
+      try {
+        if (wc && !wc.isDestroyed()) wc.send("atlas:term-exit", { id, code });
+      } catch { /* ignore */ }
+    });
+    return { ok: true, id };
+  });
+
+  ipcMain.on("atlas:term-write", (_e, { id, data }) => {
+    const s = termSessions.get(id);
+    if (s && s.proc.stdin.writable) {
+      try { s.proc.stdin.write(String(data)); } catch { /* ignore */ }
+    }
+  });
+
+  ipcMain.on("atlas:term-signal", (_e, { id, signal }) => {
+    const s = termSessions.get(id);
+    if (!s || !s.proc.pid) return;
+    const sig = signal || "SIGINT";
+    if (process.platform === "win32") {
+      // ویندوز سیگنال گروه فرآیندی ندارد؛ بهترین تلاش برای وقفه (ممکن است شل بسته شود)
+      try { s.proc.kill(sig); } catch { /* ignore */ }
+      return;
+    }
+    // اول به کل گروه فرآیند (مثل Ctrl+C واقعی)؛ اگر نشد به خود شل
+    try { process.kill(-s.proc.pid, sig); }
+    catch { try { s.proc.kill(sig); } catch { /* ignore */ } }
+  });
+
+  ipcMain.on("atlas:term-kill", (_e, { id }) => {
+    const s = termSessions.get(id);
+    if (s) {
+      try { s.proc.kill("SIGKILL"); } catch { /* ignore */ }
+      termSessions.delete(id);
+    }
+  });
+
+  app.on("will-quit", () => {
+    for (const [, s] of termSessions) { try { s.proc.kill("SIGKILL"); } catch { /* ignore */ } }
+    termSessions.clear();
+  });
+}
+
 function registerBackend() {
+  registerTerminal();
   ipcMain.handle("atlas:tool", async (_e, { tool, args }) => {
     const fn = tools[tool];
     if (!fn) return { ok: false, error: `ابزار ناشناخته: ${tool}` };

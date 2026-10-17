@@ -33,7 +33,7 @@ function createWindow() {
     minHeight: 600,
     title: 'Atlas',
     backgroundColor: '#05060a',
-    icon: path.join(__dirname, 'icons', '512x512.png'),
+    icon: path.join(__dirname, 'icons', '256x256.png'),
     autoHideMenuBar: true,
     show: false,
       webPreferences: {

@@ -98,7 +98,11 @@ function App(): React.JSX.Element {
     const check = (): void => {
       if (!alive) return
       try {
-        setHasStarted(runtime.thread.getState().messages.length > 0)
+        const n = runtime.thread.getState().messages.length
+        setHasStarted(n > 0)
+        // شمارندهٔ زنده برای ضداسپم دکمهٔ «مکالمهٔ جدید»
+        const cs = useConversationsStore.getState()
+        cs.setLiveCount(cs.activeId, n)
       } catch { /* هنوز آماده نیست */ }
     }
     check()

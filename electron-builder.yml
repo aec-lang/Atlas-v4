@@ -6,6 +6,8 @@ directories:
 files:
   - dist/**
   - desktop/main.cjs
+  - desktop/preload.cjs
+  - desktop/backend.cjs
 electronLanguages:
   - en-US
 linux:
@@ -15,3 +17,8 @@ linux:
     - AppImage
 appImage:
   artifactName: Atlas-${version}-${arch}.AppImage
+win:
+  target:
+    - portable
+portable:
+  artifactName: Atlas-${version}-${arch}.exe

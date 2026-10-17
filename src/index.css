@@ -359,7 +359,11 @@ div[data-slot='atlas-audio-player'] canvas {
 /* ─── BorderBeam (الگوی آماده: نور متحرک دور حاشیه) ─── */
 @property --beam-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
 @keyframes beam-spin { to { --beam-angle: 360deg; } }
-.beam-border { position: relative; }
+/* position: relative فقط وقتی که المنت position دیگری (مثل fixed دیالوگ) ندارد —
+   وگرنه fixed دیالوگ را می‌شکست و پاپ‌آپ از صفحه بیرون می‌رفت */
+@layer components {
+  .beam-border { position: relative; }
+}
 .beam-border::before {
   content: '';
   position: absolute; inset: 0; border-radius: inherit; padding: 1px;

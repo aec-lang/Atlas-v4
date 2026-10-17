@@ -26,6 +26,8 @@ export function Sidebar({ onClose }: { onClose: () => void }): React.JSX.Element
 
   const conversations = useConversationsStore(s => s.conversations)
   const activeId = useConversationsStore(s => s.activeId)
+  const liveCounts = useConversationsStore(s => s.liveCounts)
+  const threads = useMessagesStore(s => s.threads)
   const createConv = useConversationsStore(s => s.create)
   const removeConv = useConversationsStore(s => s.remove)
   const renameConv = useConversationsStore(s => s.rename)
@@ -34,6 +36,14 @@ export function Sidebar({ onClose }: { onClose: () => void }): React.JSX.Element
   const setActive = useConversationsStore(s => s.setActive)
 
   const installedCount = useSkillsStore(s => Object.keys(s.installed).length)
+
+  /** مکالمهٔ فعلی هیچ پیامی ندارد → دکمهٔ «مکالمهٔ جدید» غیرفعال می‌ماند */
+  const activeEmpty = (() => {
+    if (!activeId) return false
+    const repo = threads[activeId]?.repository as { messages?: unknown[] } | undefined
+    if (Array.isArray(repo?.messages) && repo.messages.length > 0) return false
+    return (liveCounts[activeId] ?? 0) === 0
+  })()
 
   // باز شدن فروشگاه مهارتها از دکمهٔ مرورگر/پرامپت (رویداد سراسری)
   useEffect(() => {
@@ -95,9 +105,11 @@ export function Sidebar({ onClose }: { onClose: () => void }): React.JSX.Element
         />
       </div>
 
-      {/* مکالمهٔ جدید */}
+      {/* مکالمهٔ جدید — وقتی مکالمهٔ فعلی هنوز خالی است غیرفعال */}
       <button onClick={() => { createConv(); onClose?.() }}
-        className="btn-gradient rise-in stagger-2 mb-3 flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-medium">
+        disabled={activeEmpty}
+        title={activeEmpty ? 'مکالمهٔ فعلی هنوز خالی است' : 'مکالمهٔ جدید'}
+        className="btn-gradient rise-in stagger-2 mb-3 flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40">
         <MessageSquarePlus size={16} /> مکالمهٔ جدید
         <kbd className="mr-auto rounded-md px-1.5 py-0.5 text-[9px] glass" style={{ color: 'rgba(255,255,255,.8)' }}>Ctrl K</kbd>
       </button>

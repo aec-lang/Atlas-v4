@@ -67,7 +67,10 @@ export function withTimeout(ms: number): AbortSignal {
  * تا کلیدهای API در لایهٔ شبکهٔ مرورگر (قابل مشاهده با Inspector) ظاهر نشوند.
  */
 export async function proxyFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  const api = (window as unknown as { atlasAPI?: AtlasAPI }).atlasAPI
+  const api =
+    typeof window !== 'undefined'
+      ? (window as unknown as { atlasAPI?: AtlasAPI }).atlasAPI
+      : undefined
   if (api?.proxy) {
     const r = await api.proxy({
       url,

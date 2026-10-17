@@ -26,11 +26,34 @@ export interface ProxyResult {
   error?: string
 }
 
+export interface TerminalStartResult {
+  ok: boolean
+  id?: string
+  error?: string
+}
+
+export interface TerminalAPI {
+  /** ساخت نشست شل جدید — برمیگرداند شناسهٔ نشست */
+  start: () => Promise<TerminalStartResult>
+  /** نوشتن در stdin شل */
+  write: (id: string, data: string) => void
+  /** فرستادن سیگنال (مثل SIGINT برای Ctrl+C) */
+  signal: (id: string, signal?: string) => void
+  /** بستن نشست */
+  kill: (id: string) => void
+  /** خروجی شل: { id, data } */
+  onData: (cb: (d: { id: string; data: string }) => void) => () => void
+  /** پایان نشست: { id, code } */
+  onExit: (cb: (d: { id: string; code: number | null }) => void) => () => void
+}
+
 export interface AtlasAPI {
   platform: string
   invokeTool: (tool: string, args: Record<string, unknown>) => Promise<Record<string, unknown>>
   captureScreen: () => Promise<string>
   openExternal: (url: string) => void
+  /** ترمینال تعاملی (فقط دسکتاپ) */
+  terminal?: TerminalAPI
   /** تنظیم نیازبه‌تأیید دستورات خطرناک (شل/کشتن فرآیند/موس/کیبورد) */
   setConfirm?: (enabled: boolean) => void
   /** تنظیم حالت پلن (در انتظار تأیید ماندن دستورات خطرناک) */

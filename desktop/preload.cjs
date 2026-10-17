@@ -20,6 +20,23 @@ contextBridge.exposeInMainWorld("atlasAPI", {
   setConfirm: (enabled) => ipcRenderer.invoke("atlas:set-confirm", enabled),
   setPlan: (enabled) => ipcRenderer.invoke("atlas:set-plan", enabled),
   proxy: (opts) => ipcRenderer.invoke("atlas:proxy", opts),
+  /** ترمینال تعاملی — نشست شل واقعی */
+  terminal: {
+    start: () => ipcRenderer.invoke("atlas:term-start"),
+    write: (id, data) => ipcRenderer.send("atlas:term-write", { id, data }),
+    signal: (id, signal) => ipcRenderer.send("atlas:term-signal", { id, signal }),
+    kill: (id) => ipcRenderer.send("atlas:term-kill", { id }),
+    onData: (cb) => {
+      const listener = (_e, data) => cb(data);
+      ipcRenderer.on("atlas:term-data", listener);
+      return () => ipcRenderer.removeListener("atlas:term-data", listener);
+    },
+    onExit: (cb) => {
+      const listener = (_e, data) => cb(data);
+      ipcRenderer.on("atlas:term-exit", listener);
+      return () => ipcRenderer.removeListener("atlas:term-exit", listener);
+    },
+  },
   onActivity: (cb) => {
     const listener = (_e, data) => cb(data);
     ipcRenderer.on("atlas:activity", listener);

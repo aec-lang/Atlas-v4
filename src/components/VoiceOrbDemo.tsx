@@ -12,7 +12,7 @@ export function VoiceOrbDemo({ open, onClose }: { open: boolean; onClose: () => 
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="glass-strong beam-border max-w-xl translate-y-0 gap-0 overflow-hidden rounded-[1.8rem] p-0" style={{ background: 'var(--bg-base)' }}>
+      <DialogContent className="glass-strong beam-border max-w-xl gap-0 overflow-hidden rounded-[1.8rem] p-0" style={{ background: 'var(--bg-base)' }}>
         <header className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: 'var(--glass-border)' }}>
           <span className="text-lg">🔮</span>
           <span className="text-sm font-bold">اورب صوتی (WebGL)</span>

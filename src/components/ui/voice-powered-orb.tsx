@@ -252,6 +252,8 @@ export const VoicePoweredOrb: FC<VoicePoweredOrbProps> = ({
     let glContext: OGLRenderingContext | null = null;
     let rafId: number;
     let program: Program | null = null;
+    // نگه‌داری ارجاع به هندلر resize تا در بلوک catch هم بتوان حذفش کرد
+    let resizeHandler: (() => void) | null = null;
 
     try {
       rendererInstance = new Renderer({
@@ -298,6 +300,7 @@ export const VoicePoweredOrb: FC<VoicePoweredOrbProps> = ({
         program?.uniforms.iResolution.value.set(glContext.canvas.width, glContext.canvas.height, 1);
       };
       window.addEventListener("resize", resize);
+      resizeHandler = resize;
       resize();
 
       let lastTime = 0;
@@ -371,8 +374,10 @@ export const VoicePoweredOrb: FC<VoicePoweredOrbProps> = ({
       };
     } catch (error) {
       console.error("Error initializing Voice Powered Orb:", error);
+      // حذف شنونده‌ای که ممکن است قبل از خطا اضافه شده باشد — جلوگیری از نشت حافظه
+      if (resizeHandler) window.removeEventListener("resize", resizeHandler);
       if (container && container.firstChild) container.removeChild(container.firstChild);
-      return () => { window.removeEventListener("resize", () => {}); };
+      return undefined;
     }
   }, [hue, enableVoiceControl, voiceSensitivity, maxRotationSpeed, maxHoverIntensity, vert, frag]);
 
