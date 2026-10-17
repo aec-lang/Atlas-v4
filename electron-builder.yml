@@ -18,6 +18,7 @@ linux:
 appImage:
   artifactName: Atlas-${version}-${arch}.AppImage
 win:
+  signAndEditExecutable: false
   target:
     - portable
 portable:
