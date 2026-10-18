@@ -1,4 +1,4 @@
-name: Build Atlas AppImage
+name: Build & Release Atlas
 
 on:
   push:
@@ -11,7 +11,20 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            builder_args: --linux AppImage
+            artifact_name: Atlas-Linux-AppImage
+          - os: windows-latest
+            builder_args: --win portable
+            artifact_name: Atlas-Windows-Portable
+          - os: macos-latest
+            builder_args: --mac dmg
+            artifact_name: Atlas-macOS-dmg
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,26 +36,41 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        # NOTE: npm install (not ci) — package-lock.json is not pushed (API size limits),
+        # so CI resolves fresh from package.json.
+        run: npm install --no-audit --no-fund
 
       - name: Type-check & build web bundle
         run: npm run build
 
-      - name: Build AppImage
+      - name: Build distributable
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --linux AppImage --publish never
+        run: npx electron-builder ${{ matrix.builder_args }} --publish never
 
-      - name: Upload artifact (every build)
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Atlas-AppImage
-          path: release/*.AppImage
+          name: ${{ matrix.artifact_name }}
+          path: release/*
           if-no-files-found: error
 
-      - name: Attach to release (tags only)
-        if: startsWith(github.ref, 'refs/tags/')
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la artifacts/
+
+      - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*.AppImage
+          files: artifacts/*
           generate_release_notes: true
