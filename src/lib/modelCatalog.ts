@@ -87,6 +87,42 @@ export async function proxyFetch(url: string, init: RequestInit = {}): Promise<R
   return fetch(url, init)
 }
 
+/**
+ * فچ باینری امن (مثل صوت TTS): روی دسکتاپ از پروسهٔ اصلی با responseType=base64
+ * عبور می‌کند تا کلید API لو نرود؛ در مرورگر مستقیم fetch می‌شود.
+ * برمی‌گرداند: بایت‌ها + content-type پاسخ.
+ */
+export async function proxyFetchBinary(
+  url: string,
+  init: RequestInit = {},
+): Promise<{ bytes: Uint8Array; contentType: string }> {
+  const api =
+    typeof window !== 'undefined'
+      ? (window as unknown as { atlasAPI?: AtlasAPI }).atlasAPI
+      : undefined
+  if (api?.proxy) {
+    const r = await api.proxy({
+      url,
+      method: init.method ?? 'GET',
+      headers: (init.headers as Record<string, string>) ?? {},
+      body: typeof init.body === 'string' ? init.body : undefined,
+      responseType: 'base64',
+    })
+    if (!r.ok || !r.body) throw new Error(r.error ?? 'خطا در پروکسی')
+    const bin = atob(r.body)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    return { bytes, contentType: r.contentType ?? 'application/octet-stream' }
+  }
+  const res = await fetch(url, init)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const buf = await res.arrayBuffer()
+  return {
+    bytes: new Uint8Array(buf),
+    contentType: res.headers.get('content-type') ?? 'application/octet-stream',
+  }
+}
+
 /** گرفتن مدلها با تایماوت و مدیریت خطای خوانا */
 async function fetchJson(url: string, headers: Record<string, string>): Promise<unknown> {
   const res = await proxyFetch(url, {

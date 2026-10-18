@@ -2,12 +2,11 @@
 
 import { memo, useCallback, useRef, useState } from "react";
 import {
-  AlertCircleIcon,
-  CheckIcon,
   ChevronDownIcon,
   LoaderIcon,
   XCircleIcon,
 } from "lucide-react";
+import { getToolMeta } from "./toolMeta";
 import {
   useScrollLock,
   useToolCallElapsed,
@@ -86,14 +85,55 @@ function ToolFallbackRoot({
   );
 }
 
-type ToolStatus = ToolCallMessagePartStatus["type"];
+/**
+ * کارت قشنگ tool call — آیکون Lucide مخصوص هر ابزار + لیبل فارسی،
+ * استایل سابتِل/ترنسپرنت، بدون ایموجی. (سلیقهٔ صریح کاربر)
+ */
+function ToolCallDisplay({
+  toolName,
+  status,
+  className,
+  ...props
+}: React.ComponentProps<"span"> & {
+  toolName: string;
+  status?: ToolCallMessagePartStatus;
+}) {
+  const statusType = status?.type ?? "complete";
+  const isRunning = statusType === "running";
+  const isError =
+    statusType === "incomplete" &&
+    (status as { reason?: string })?.reason !== "cancelled";
+  const isCancelled =
+    statusType === "incomplete" &&
+    (status as { reason?: string })?.reason === "cancelled";
 
-const statusIconMap: Record<ToolStatus, React.ElementType> = {
-  running: LoaderIcon,
-  complete: CheckIcon,
-  incomplete: XCircleIcon,
-  "requires-action": AlertCircleIcon,
-};
+  const meta = getToolMeta(toolName);
+  const Icon = isRunning ? LoaderIcon : isError ? XCircleIcon : meta.icon;
+
+  return (
+    <span
+      data-slot="tool-call-display"
+      className={cn(
+        "inline-flex items-center gap-2",
+        isCancelled && "line-through",
+        className,
+      )}
+      {...props}
+    >
+      <Icon
+        data-slot="tool-call-display-icon"
+        className={cn(
+          "size-4 shrink-0",
+          isError && "text-destructive",
+          isRunning && "animate-spin [animation-duration:0.6s]",
+        )}
+      />
+      <span data-slot="tool-call-display-label" className="leading-none">
+        {meta.label}
+      </span>
+    </span>
+  );
+}
 
 const formatToolDuration = (ms: number) => {
   if (ms < 1000) return "<1s";
@@ -133,14 +173,6 @@ function ToolFallbackTrigger({
   toolName: string;
   status?: ToolCallMessagePartStatus;
 }) {
-  const statusType = status?.type ?? "complete";
-  const isRunning = statusType === "running";
-  const isCancelled =
-    status?.type === "incomplete" && status.reason === "cancelled";
-
-  const Icon = statusIconMap[statusType];
-  const label = isCancelled ? "Cancelled tool" : "Used tool";
-
   return (
     <CollapsibleTrigger
       data-slot="tool-fallback-trigger"
@@ -150,34 +182,7 @@ function ToolFallbackTrigger({
       )}
       {...props}
     >
-      <Icon
-        data-slot="tool-fallback-trigger-icon"
-        className={cn(
-          "aui-tool-fallback-trigger-icon size-4 shrink-0",
-          isCancelled && "text-muted-foreground",
-          isRunning && "animate-spin [animation-duration:0.6s]",
-        )}
-      />
-      <span
-        data-slot="tool-fallback-trigger-label"
-        className={cn(
-          "aui-tool-fallback-trigger-label-wrapper relative inline-block text-start leading-none",
-          isCancelled && "text-muted-foreground line-through",
-        )}
-      >
-        <span>
-          {label}: <b>{toolName}</b>
-        </span>
-        {isRunning && (
-          <span
-            aria-hidden
-            data-slot="tool-fallback-trigger-shimmer"
-            className="aui-tool-fallback-trigger-shimmer shimmer pointer-events-none absolute inset-0 motion-reduce:animate-none"
-          >
-            {label}: <b>{toolName}</b>
-          </span>
-        )}
-      </span>
+      <ToolCallDisplay toolName={toolName} status={status} />
       <ToolFallbackDuration />
       <ChevronDownIcon
         data-slot="tool-fallback-trigger-chevron"
@@ -265,7 +270,7 @@ function ToolFallbackResult({
       {...props}
     >
       <p className="aui-tool-fallback-result-header text-muted-foreground text-xs font-medium">
-        Result:
+        نتیجه:
       </p>
       <pre className="aui-tool-fallback-result-content bg-muted/50 text-foreground/90 mt-1 rounded-md p-2.5 text-xs whitespace-pre-wrap">
         {typeof result === "string" ? result : JSON.stringify(result, null, 2)}
@@ -293,7 +298,7 @@ function ToolFallbackError({
   if (!errorText) return null;
 
   const isCancelled = status.reason === "cancelled";
-  const headerText = isCancelled ? "Cancelled reason:" : "Error:";
+  const headerText = isCancelled ? "دلیل لغو:" : "خطا:";
 
   return (
     <div

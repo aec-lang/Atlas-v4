@@ -5,6 +5,12 @@
  */
 import { jsonSchema, tool, type ToolSet, type Tool, type Schema } from "ai";
 import { useActivityStore } from "@/stores/activityStore";
+import {
+  TASKS,
+  useSettingsStore,
+  type ProviderKind,
+  type TaskKind,
+} from "@/stores/settingsStore";
 import type { AtlasAPI } from "@/types/atlas-api";
 
 type RawResult = {
@@ -279,5 +285,214 @@ export function buildAgentTools(): ToolSet {
         }
       },
     }),
+
+    /* ─── تنظیم محاوره‌ای پرووایدرها (BYO API) ─── */
+
+    get_task_config: atlasTool({
+      description:
+        "خواندن تنظیمات فعلی یک کار (چت متنی، چت صوتی، تولید تصویر، تولید ویدیو، مدل سه‌بعدی، صوتی/TTS): پرووایدر، مدل، آدرس. مقدار کلید API هرگز برنمی‌گردد (فقط اینکه ست شده یا نه).",
+      schema: {
+        type: "object",
+        properties: {
+          task: {
+            type: "string",
+            enum: TASKS.map(t => t.id),
+            description: "شناسهٔ کار: text-chat | voice-chat | image | video | 3d | tts",
+          },
+        },
+        required: ["task"],
+      },
+      execute: async (a) => {
+        const task = str(a.task) as TaskKind;
+        if (!TASKS.some(t => t.id === task)) {
+          return { ok: false, error: `کار نامعتبر: ${task}` };
+        }
+        const cfg = useSettingsStore.getState().taskConfigs[task];
+        const label = TASKS.find(t => t.id === task)?.name ?? task;
+        return {
+          ok: true,
+          task,
+          taskName: label,
+          provider: cfg.provider,
+          model: cfg.model,
+          baseURL: cfg.baseURL,
+          hasApiKey: cfg.apiKey.trim().length > 0,
+          customName: cfg.custom?.name?.trim() || undefined,
+          // امنیت: مقدار کلید عمداً برنمی‌گردد
+        };
+      },
+    }),
+
+    set_task_config: atlasTool({
+      description:
+        "تنظیم پرووایدر/کلید/مدل یک کار از روی حرف کاربر (مثلاً «کلید fal من اینه»). فیلدهای عادی فوراً اعمال می‌شوند؛ ولی ذخیرهٔ کلید API فقط با تأیید صریح کاربر انجام می‌شود: بار اول بدون confirmed صدا بزن تا خلاصهٔ در انتظار تأیید برگردد، بعد از «تأیید» گفتن کاربر دوباره با confirmed=true صدا بزن.",
+      schema: {
+        type: "object",
+        properties: {
+          task: {
+            type: "string",
+            enum: TASKS.map(t => t.id),
+            description: "شناسهٔ کار",
+          },
+          provider: {
+            type: "string",
+            enum: ["openai", "ollama", "anthropic", "gemini", "custom"],
+            description: "پرووایدر (اختیاری)",
+          },
+          apiKey: { type: "string", description: "کلید API — فقط با تأیید صریح کاربر ذخیره می‌شود" },
+          baseURL: { type: "string", description: "آدرس پایه (اختیاری)" },
+          model: { type: "string", description: "مدل (اختیاری)" },
+          customName: { type: "string", description: "نام پرووایدر کاستوم (اختیاری)" },
+          confirmed: {
+            type: "boolean",
+            description: "تأیید صریح کاربر برای ذخیرهٔ کلید (وقتی pending برگشت، بعد از تأیید کاربر true بگذار)",
+          },
+        },
+        required: ["task"],
+      },
+      execute: async (a) => {
+        const task = str(a.task) as TaskKind;
+        if (!TASKS.some(t => t.id === task)) {
+          return { ok: false, error: `کار نامعتبر: ${task}` };
+        }
+        const label = TASKS.find(t => t.id === task)?.name ?? task;
+        const store = useSettingsStore.getState();
+
+        const patch: Record<string, unknown> = {};
+        const provider = str(a.provider);
+        if (provider) {
+          const valid: ProviderKind[] = ["openai", "ollama", "anthropic", "gemini", "custom"];
+          if (!valid.includes(provider as ProviderKind)) {
+            return { ok: false, error: `پرووایدر نامعتبر: ${provider}` };
+          }
+          patch.provider = provider;
+        }
+        if (typeof a.baseURL === "string") patch.baseURL = a.baseURL;
+        if (typeof a.model === "string") patch.model = a.model;
+        const customName = str(a.customName);
+        if (customName) {
+          const cur = store.taskConfigs[task].custom;
+          patch.custom = { ...(cur ?? {}), name: customName };
+        }
+
+        const apiKey = str(a.apiKey);
+        if (apiKey) {
+          // ─── ذخیرهٔ کلید فقط با تأیید صریح ───
+          if (a.confirmed !== true) {
+            pendingKeyPatch = { task, apiKey, ts: Date.now() };
+            return {
+              ok: true,
+              pending: true,
+              task,
+              taskName: label,
+              summary: `کلید جدید برای «${label}» آمادهٔ ذخیره است (…${apiKey.slice(-4)}).`,
+              hint: "از کاربر تأیید صریح بگیر (مثلاً «تأیید می‌کنم») و بعد همین ابزار را با confirmed=true صدا بزن. بدون تأیید، کلید ذخیره نمی‌شود.",
+            };
+          }
+          const pend = pendingKeyPatch;
+          if (!pend || pend.task !== task || Date.now() - pend.ts > 5 * 60 * 1000) {
+            return {
+              ok: false,
+              error: "درخواست تأیید معتبر/تازه‌ای برای این کار نیست — اول بدون confirmed صدا بزن تا pending ساخته شود.",
+            };
+          }
+          patch.apiKey = pend.apiKey;
+          pendingKeyPatch = null;
+        }
+
+        if (Object.keys(patch).length === 0) {
+          return { ok: false, error: "هیچ فیلدی برای تنظیم داده نشد." };
+        }
+        store.setTaskConfig(task, patch as Parameters<typeof store.setTaskConfig>[1]);
+        return {
+          ok: true,
+          task,
+          taskName: label,
+          applied: Object.keys(patch),
+          note: apiKey ? "کلید با تأیید کاربر ذخیره شد." : "تنظیمات اعمال شد.",
+        };
+      },
+    }),
+    /* ─── کارهای پس‌زمینه و زمان‌بندی‌شده ─── */
+
+    create_background_task: atlasTool({
+      description:
+        "سپردن یک کار به «ایجنت پس‌زمینه»: کاربر می‌گوید «تو پس‌زمینه انجام بده» و می‌رود سر کارش؛ " +
+        "ایجنت بدون UI اجرا می‌شود و با تمام‌شدن، ناتیفیکیشن دسکتاپ می‌آید و نتیجه در پنل «کارها» " +
+        "قابل مشاهده است. فقط در نسخهٔ دسکتاپ کار می‌کند.",
+      schema: {
+        type: "object",
+        properties: {
+          prompt: { type: "string", description: "شرح کامل کاری که باید انجام شود" },
+          title: { type: "string", description: "عنوان کوتاه (اختیاری)" },
+        },
+        required: ["prompt"],
+      },
+      execute: async (a) => {
+        const { createAndRunBackgroundTask } = await import("@/lib/tasksSync");
+        const r = await createAndRunBackgroundTask(str(a.prompt), str(a.title) || undefined);
+        if (!r.ok) return { ok: false, error: r.error };
+        return {
+          ok: true,
+          taskId: r.id,
+          note: "تسک پس‌زمینه ساخته و اجرا شد؛ با تمام‌شدن، ناتیفیکیشن دسکتاپ می‌آید و نتیجه در پنل «کارها» است.",
+        };
+      },
+    }),
+
+    schedule_task: atlasTool({
+      description:
+        "ساخت «تسک زمان‌بندی‌شده»: کاربر می‌گوید «هر صبح ساعت ۸ …»؛ زمان با زبان طبیعی فارسی " +
+        "فهمیده می‌شود (مثل «هر صبح ساعت ۸»، «هر ۳۰ دقیقه»، «هر جمعه ساعت ۹») یا می‌توان کرون مستقیم داد. " +
+        "در موعد مقرر ایجنت خودکار اجرا می‌شود و نتیجه با ناتیفیکیشن اعلام می‌گردد.",
+      schema: {
+        type: "object",
+        properties: {
+          prompt: { type: "string", description: "کاری که در هر اجرا انجام شود" },
+          when: {
+            type: "string",
+            description: "زمان به زبان طبیعی فارسی («هر صبح ساعت ۸») یا کرون («0 8 * * *»)",
+          },
+          title: { type: "string", description: "عنوان (اختیاری)" },
+        },
+        required: ["prompt", "when"],
+      },
+      execute: async (a) => {
+        const { parseScheduleFa, isValidCron } = await import("@/lib/scheduleParse");
+        const when = str(a.when).trim();
+        const parsed = when ? parseScheduleFa(when) : null;
+        const cron = parsed?.cron ?? (when && isValidCron(when) ? when : null);
+        if (!cron) {
+          return {
+            ok: false,
+            error:
+              "زمان را نفهمیدم. مثال‌های معتبر: «هر صبح ساعت ۸»، «هر ۳۰ دقیقه»، «هر جمعه ساعت ۹»، یا کرون مثل «0 8 * * *».",
+          };
+        }
+        const api = getApi();
+        if (!api?.scheduleAdd) {
+          return { ok: false, error: "زمان‌بند فقط در نسخهٔ دسکتاپ (Electron) در دسترس است." };
+        }
+        const r = await api.scheduleAdd({
+          title: str(a.title).trim() || str(a.prompt).slice(0, 60),
+          prompt: str(a.prompt),
+          cron,
+          label: parsed?.label ?? cron,
+        });
+        if (!r.ok) return { ok: false, error: r.error ?? "ثبت زمان‌بند ناموفق بود" };
+        return {
+          ok: true,
+          scheduleId: r.id,
+          when: parsed?.label ?? cron,
+          note: `زمان‌بند ثبت شد (${parsed?.label ?? cron})؛ در موعد مقرر خودکار اجرا و با ناتیفیکیشن اعلام می‌شود. مدیریت از پنل «کارها».`,
+        };
+      },
+    }),
   };
 }
+
+/**
+ * درخواستِ در انتظارِ ذخیرهٔ کلید — فقط یکی در لحظه.
+ * با تأیید صریح کاربر (confirmed=true) مصرف می‌شود؛ بعد از ۵ دقیقه منقضی است.
+ */
+let pendingKeyPatch: { task: TaskKind; apiKey: string; ts: number } | null = null;
