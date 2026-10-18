@@ -49,12 +49,20 @@ export interface AuditEntry {
 
 /* ─── کلاینت skills.sh ─── */
 
-const PROXY = '/skills-api'
+import { proxyFetch } from './modelCatalog'
+
+const PROXY = '/skills-api' // فقط در حالت توسعه (پروکسی Vite)
+const SKILLS_SH_BASE = 'https://skills.sh/api/v1' // حالت پکیج‌شده: از پروسهٔ اصلی عبور میکند
 
 async function apiFetch<T>(path: string, token?: string): Promise<T> {
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(`${PROXY}${path}`, { headers })
+  // در اپ پکیج‌شده (Electron/file://) پروکسی Vite وجود ندارد؛ پس مستقیم به
+  // دامنهٔ skills.sh میزنیم و proxyFetch آن را از پروسهٔ اصلی عبور میدهد
+  // (دور زدن CORS). در حالت توسعه از پروکسی Vite استفاده میشود.
+  const hasMainProxy = typeof window !== 'undefined' && !!window.atlasAPI?.proxy
+  const url = hasMainProxy ? `${SKILLS_SH_BASE}${path}` : `${PROXY}${path}`
+  const res = await proxyFetch(url, { headers })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     throw new Error(`skills.sh ${res.status}: ${body.slice(0, 120)}`)
@@ -170,7 +178,21 @@ const FALLBACK_CATALOG: SkillSummary[] = [
   { id: 'mattpocock/skills/improve-codebase-architecture', slug: 'improve-codebase-architecture', name: 'Improve Codebase Architecture', source: 'mattpocock/skills', installs: 790_500, sourceType: 'github', installUrl: 'https://github.com/mattpocock/skills', url: 'https://skills.sh/mattpocock/skills/improve-codebase-architecture' },
   { id: 'mattpocock/skills/diagnosing-bugs', slug: 'diagnosing-bugs', name: 'Diagnosing Bugs', source: 'mattpocock/skills', installs: 470_300, sourceType: 'github', installUrl: 'https://github.com/mattpocock/skills', url: 'https://skills.sh/mattpocock/skills/diagnosing-bugs' },
   { id: 'remotion-dev/skills/remotion-best-practices', slug: 'remotion-best-practices', name: 'Remotion Best Practices', source: 'remotion-dev/skills', installs: 494_200, sourceType: 'github', installUrl: 'https://github.com/remotion-dev/skills', url: 'https://skills.sh/remotion-dev/skills/remotion-best-practices' },
-  { id: 'microsoft/azure-skills/microsoft-foundry', slug: 'microsoft-foundry', name: 'Microsoft Foundry', source: 'microsoft/azure-skills', installs: 550_400, sourceType: 'github', installUrl: 'https://github.com/microsoft/azure-skills', url: 'https://skills.sh/microsoft/azure-skills/microsoft-foundry' }
+  { id: 'microsoft/azure-skills/microsoft-foundry', slug: 'microsoft-foundry', name: 'Microsoft Foundry', source: 'microsoft/azure-skills', installs: 550_400, sourceType: 'github', installUrl: 'https://github.com/microsoft/azure-skills', url: 'https://skills.sh/microsoft/azure-skills/microsoft-foundry' },
+  // دستهٔ دوم: مهارتهای رسمی و پرکاربرد — برای وقتی که API در دسترس نیست
+  // (تعداد نصبها تقریبی است و فقط در حالت آفلاین نمایش داده میشود)
+  { id: 'anthropics/skills/skill-creator', slug: 'skill-creator', name: 'Skill Creator', source: 'anthropics/skills', installs: 400_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/skill-creator' },
+  { id: 'anthropics/skills/pdf', slug: 'pdf', name: 'PDF', source: 'anthropics/skills', installs: 350_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/pdf' },
+  { id: 'anthropics/skills/docx', slug: 'docx', name: 'DOCX', source: 'anthropics/skills', installs: 300_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/docx' },
+  { id: 'anthropics/skills/pptx', slug: 'pptx', name: 'PPTX', source: 'anthropics/skills', installs: 280_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/pptx' },
+  { id: 'anthropics/skills/xlsx', slug: 'xlsx', name: 'XLSX', source: 'anthropics/skills', installs: 260_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/xlsx' },
+  { id: 'anthropics/skills/mcp-builder', slug: 'mcp-builder', name: 'MCP Builder', source: 'anthropics/skills', installs: 220_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/mcp-builder' },
+  { id: 'anthropics/skills/artifacts-builder', slug: 'artifacts-builder', name: 'Artifacts Builder', source: 'anthropics/skills', installs: 200_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/artifacts-builder' },
+  { id: 'anthropics/skills/canvas-design', slug: 'canvas-design', name: 'Canvas Design', source: 'anthropics/skills', installs: 180_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/canvas-design' },
+  { id: 'anthropics/skills/algorithmic-art', slug: 'algorithmic-art', name: 'Algorithmic Art', source: 'anthropics/skills', installs: 150_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/algorithmic-art' },
+  { id: 'anthropics/skills/webapp-testing', slug: 'webapp-testing', name: 'Webapp Testing', source: 'anthropics/skills', installs: 140_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/webapp-testing' },
+  { id: 'anthropics/skills/doc-coauthoring', slug: 'doc-coauthoring', name: 'Doc Coauthoring', source: 'anthropics/skills', installs: 120_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/doc-coauthoring' },
+  { id: 'anthropics/skills/theme-factory', slug: 'theme-factory', name: 'Theme Factory', source: 'anthropics/skills', installs: 100_000, sourceType: 'github', installUrl: 'https://github.com/anthropics/skills', url: 'https://skills.sh/anthropics/skills/theme-factory' },
 ]
 
 async function fallbackCatalog(): Promise<CatalogResult> {
@@ -178,7 +200,7 @@ async function fallbackCatalog(): Promise<CatalogResult> {
 }
 
 /** جستوجو — skills.sh semantic/fuzzy ، فالبک: فیلتر روی کاتالوگ فالبک */
-export async function searchSkills(q: string, limit = 30): Promise<CatalogResult> {
+export async function searchSkills(q: string, limit = 100): Promise<CatalogResult> {
   const query = q.trim()
   if (query.length < 2) return fetchCatalog('trending')
   try {
