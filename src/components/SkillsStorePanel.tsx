@@ -28,20 +28,35 @@ export function SkillsStorePanel({
   const [query, setQuery] = useState('')
   const [skills, setSkills] = useState<SkillSummary[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const [dataSource, setDataSource] = useState<'skills.sh' | 'fallback'>('skills.sh')
   const [detailId, setDetailId] = useState<string | null>(null)
 
   // بارگذاری کاتالوگ (با نشانهٔ درخواست برای جلوگیری از race condition)
+  // nextPage > 0 یعنی «نمایش بیشتر» — نتایج به انتهای لیست اضافه میشوند
   const reqRef = useRef(0)
-  const loadCatalog = useCallback(async (v: Tab, token: number) => {
-    setLoading(true)
+  const loadCatalog = useCallback(async (v: Tab, token: number, nextPage = 0) => {
+    if (nextPage === 0) setLoading(true)
+    else setLoadingMore(true)
     try {
-      const r = await fetchCatalog(v === 'all' ? 'all-time' : v)
-      if (reqRef.current === token) { setSkills(r.skills); setDataSource(r.source) }
+      const r = await fetchCatalog(v === 'all' ? 'all-time' : v, nextPage)
+      if (reqRef.current === token) {
+        setSkills(prev => (nextPage === 0 ? r.skills : [...prev, ...r.skills]))
+        setPage(nextPage)
+        setHasMore(r.hasMore)
+        setDataSource(r.source)
+      }
     } finally {
-      if (reqRef.current === token) setLoading(false)
+      if (reqRef.current === token) { setLoading(false); setLoadingMore(false) }
     }
   }, [])
+
+  const loadMore = useCallback(() => {
+    const token = ++reqRef.current
+    void loadCatalog(tab, token, page + 1)
+  }, [tab, page, loadCatalog])
 
   useEffect(() => {
     if (!open || detailId) return
@@ -50,7 +65,7 @@ export function SkillsStorePanel({
     if (query.trim().length >= 2) {
       const t = setTimeout(() => {
         void searchSkills(query).then(r => {
-          if (reqRef.current === token) { setSkills(r.skills); setDataSource(r.source) }
+          if (reqRef.current === token) { setSkills(r.skills); setDataSource(r.source); setHasMore(false); setPage(0) }
         })
       }, 350)
       return () => clearTimeout(t)
@@ -137,6 +152,14 @@ export function SkillsStorePanel({
                 <p className="mt-8 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
                   چیزی پیدا نشد — عبارت دیگری امتحان کن
                 </p>
+              )}
+              {hasMore && query.trim().length < 2 && skills.length > 0 && (
+                <button onClick={loadMore} disabled={loadingMore}
+                  className="glass glass-hover mx-auto mt-2 flex items-center gap-2 rounded-2xl px-5 py-2 text-[11px] font-medium disabled:opacity-50"
+                  style={{ color: 'var(--accent)' }}>
+                  {loadingMore ? <Loader2 size={12} className="animate-spin" /> : null}
+                  {loadingMore ? 'در حال دریافت...' : 'نمایش مهارتهای بیشتر ↓'}
+                </button>
               )}
             </div>
           )}

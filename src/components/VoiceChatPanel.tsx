@@ -98,6 +98,9 @@ export function VoiceChatPanel({ open, onClose }: { open: boolean; onClose: () =
     setState('idle')
     setLevel(0)
     if (text.trim()) {
+      // متن تشخیص‌داده‌شده به موتور گفت‌وگو می‌رود — یعنی کانفیگ task «چت متنی»
+      // (آداپتور AtlasChatAdapter). کانفیگ «چت صوتی» برای پایپ‌لاین اختصاصی
+      // STT/TTS رزرو شده و فعلاً موتور واقعی ندارد.
       aui.thread.append(text.trim())
       setText('')
     }

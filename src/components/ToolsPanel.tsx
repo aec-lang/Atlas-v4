@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'motion/react'
 import {
   X, Save, Trash2, Play, Plus, RefreshCw, Download, Upload,
-  Clock, ListTree, Cpu, Search, Layers, Radio, History, Cloud
+  Clock, ListTree, Cpu, Search, Layers, Radio, History, Cloud, Plug
 } from 'lucide-react'
 import { useAui } from '@assistant-ui/react'
 import { usePlanStore } from '@/stores/planStore'
@@ -18,18 +18,22 @@ import { useToastStore } from '@/stores/toastStore'
 import { AnimatedNumber } from '@/components/fx/AnimatedNumber'
 import { celebrate } from '@/lib/celebrate'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useSettingsStore, getModelSettings } from '@/stores/settingsStore'
+import { useSettingsStore, getTaskConfig } from '@/stores/settingsStore'
 import { useConversationsStore, useMessagesStore } from '@/stores/conversationsStore'
 import { proxyFetch } from '@/lib/modelCatalog'
 import { ragAddDocument, ragList, ragRemove, ragClear, ragQuery, formatRagContext } from '@/lib/rag'
 import { semanticQuery, indexConversation } from '@/lib/semanticIndex'
 import { syncPush, syncPull, collectSnapshot, applySnapshot } from '@/lib/sync'
+import { TasksPanel } from '@/components/TasksPanel'
+import { McpPanel } from '@/components/McpPanel'
 
-type Tab = 'macros' | 'schedule' | 'plan' | 'system' | 'rag' | 'ensemble' | 'semantic' | 'replay' | 'sync'
+type Tab = 'macros' | 'schedule' | 'plan' | 'system' | 'rag' | 'ensemble' | 'semantic' | 'replay' | 'sync' | 'tasks' | 'mcp'
 
 const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
   { id: 'macros', label: 'ماکروها', icon: <ListTree size={14} /> },
   { id: 'schedule', label: 'زمان‌بندی', icon: <Clock size={14} /> },
+  { id: 'tasks', label: 'کارها', icon: <Layers size={14} /> },
+  { id: 'mcp', label: 'کانکتورها', icon: <Plug size={14} /> },
   { id: 'plan', label: 'حالت پلن', icon: <Radio size={14} /> },
   { id: 'system', label: 'داشبورد', icon: <Cpu size={14} /> },
   { id: 'rag', label: 'RAG محلی', icon: <Layers size={14} /> },
@@ -69,6 +73,8 @@ export function ToolsPanel({ open, onClose }: { open: boolean; onClose: () => vo
         <div className="-mr-1 min-h-0 flex-1 animate-in fade-in slide-in-from-bottom-2 duration-500 overflow-y-auto pl-1">
           {tab === 'macros' && <MacrosTab />}
           {tab === 'schedule' && <ScheduleTab />}
+          {tab === 'tasks' && <TasksPanel />}
+          {tab === 'mcp' && <McpPanel />}
           {tab === 'plan' && <PlanTab />}
           {tab === 'system' && <SystemTab />}
           {tab === 'rag' && <RagTab />}
@@ -392,7 +398,8 @@ function chatCompletion(opts: { baseURL: string; key: string; model: string; pro
 }
 
 function EnsembleTab(): React.JSX.Element {
-  const s = getModelSettings()
+  // مدل A: موتور «چت متنی» از کانفیگ task خودش (نه تنظیمات سراسری)
+  const cfg = getTaskConfig('text-chat')
   const [prompt, setPrompt] = useState('')
   const [bModel, setBModel] = useState('')
   const [bUrl, setBUrl] = useState('http://localhost:11434/v1')
@@ -403,9 +410,9 @@ function EnsembleTab(): React.JSX.Element {
   const run = async (): Promise<void> => {
     if (!prompt.trim() || !bModel.trim()) return
     setBusy(true)
-    const aBase = s.provider === 'ollama' ? s.ollamaBaseURL : s.apiBaseURL
-    const aKey = s.provider === 'anthropic' ? s.anthropicApiKey : s.apiKey
-    const aModel = s.provider === 'anthropic' ? s.anthropicModel : s.provider === 'ollama' ? s.ollamaModel : s.apiModel
+    const aBase = cfg.baseURL
+    const aKey = cfg.provider === 'ollama' ? '' : cfg.apiKey
+    const aModel = cfg.model
     try {
       const [ra, rb] = await Promise.all([
         chatCompletion({ baseURL: aBase, key: aKey, model: aModel, prompt }),
