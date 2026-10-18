@@ -2,9 +2,11 @@
  * Atlas Desktop — پروسهٔ اصلی الکترون
  * بدون منوی پیشفرض، لینکهای خارجی در مرورگر سیستم، زمینهٔ ایزوله
  */
-const { app, BrowserWindow, shell, Menu, ipcMain, desktopCapturer } = require('electron')
+const { app, BrowserWindow, shell, Menu, ipcMain, desktopCapturer, Tray } = require('electron')
 const path = require('node:path')
 const { registerBackend } = require('./backend.cjs')
+const { registerTasks } = require('./tasks.cjs')
+const { registerMcp } = require('./mcp.cjs')
 
 /** اسکرین‌شات واقعی از صفحه (در پروسهٔ اصلی؛ sandbox اجازهٔ DOM در preload را نمیدهد) */
 function registerScreenCapture() {
@@ -24,6 +26,41 @@ function registerScreenCapture() {
 }
 
 app.setName('Atlas')
+
+/* ─── Tray: بستن پنجره برنامه را نمی‌بندد تا کارهای پس‌زمینه نمیرند ─── */
+let tray = null
+let quitting = false
+
+function setupTray() {
+  if (tray) return
+  try {
+    tray = new Tray(path.join(__dirname, 'icons', '256x256.png'))
+    tray.setToolTip('Atlas')
+    tray.setContextMenu(Menu.buildFromTemplate([
+      {
+        label: 'باز کردن Atlas',
+        click: () => {
+          const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
+          if (win) { win.show(); win.focus() }
+          else createWindow()
+        },
+      },
+      {
+        label: 'خروج',
+        click: () => { quitting = true; app.quit() },
+      },
+    ]))
+    tray.on('click', () => {
+      const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
+      if (win) {
+        if (win.isVisible()) win.hide()
+        else { win.show(); win.focus() }
+      } else createWindow()
+    })
+  } catch {
+    tray = null
+  }
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -50,6 +87,13 @@ function createWindow() {
   Menu.setApplicationMenu(null)
 
   win.once('ready-to-show', () => win.show())
+  // بستن پنجره = مخفی‌شدن در tray (نه خروج) تا کارهای پس‌زمینه زنده بمانند
+  win.on('close', (e) => {
+    if (!quitting) {
+      e.preventDefault()
+      win.hide()
+    }
+  })
   // dist در ریشهٔ پروژه ساخته میشود (vite build)
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
 
@@ -70,11 +114,15 @@ function createWindow() {
 app.whenReady().then(() => {
   registerBackend()
   registerScreenCapture()
+  registerTasks()
+  registerMcp()
+  setupTray()
   createWindow()
 })
+app.on('before-quit', () => { quitting = true })
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow()
 })
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  // با tray دیگر خودکار خارج نمی‌شویم؛ خروج فقط از منوی tray («خروج»)
 })

@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld("atlasAPI", {
   setConfirm: (enabled) => ipcRenderer.invoke("atlas:set-confirm", enabled),
   setPlan: (enabled) => ipcRenderer.invoke("atlas:set-plan", enabled),
   proxy: (opts) => ipcRenderer.invoke("atlas:proxy", opts),
+  /** فایل providers.json در app-data (خواندن/نوشتن کانفیگ پرووایدرها) */
+  providersRead: () => ipcRenderer.invoke("atlas:providers-read"),
+  providersWrite: (content) => ipcRenderer.invoke("atlas:providers-write", { content }),
   /** ترمینال تعاملی — نشست شل واقعی */
   terminal: {
     start: () => ipcRenderer.invoke("atlas:term-start"),
@@ -37,9 +40,38 @@ contextBridge.exposeInMainWorld("atlasAPI", {
       return () => ipcRenderer.removeListener("atlas:term-exit", listener);
     },
   },
+  /* ─── کارهای پس‌زمینه و زمان‌بندی‌شده ─── */
+  bgCreate: (t) => ipcRenderer.invoke("atlas:bg-create", t),
+  bgUpdate: (id, patch) => ipcRenderer.invoke("atlas:bg-update", id, patch),
+  bgCancel: (id) => ipcRenderer.invoke("atlas:bg-cancel", id),
+  bgApprovalResolved: (taskId, approvalId, status, result) =>
+    ipcRenderer.invoke("atlas:bg-approval-resolved", taskId, approvalId, status, result),
+  tasksList: () => ipcRenderer.invoke("atlas:tasks-list"),
+  scheduleAdd: (s) => ipcRenderer.invoke("atlas:schedule-add", s),
+  scheduleUpdate: (id, patch) => ipcRenderer.invoke("atlas:schedule-update", id, patch),
+  scheduleRemove: (id) => ipcRenderer.invoke("atlas:schedule-remove", id),
+  onTasksChanged: (cb) => {
+    const listener = (_e, data) => cb(data);
+    ipcRenderer.on("atlas:tasks-changed", listener);
+    return () => ipcRenderer.removeListener("atlas:tasks-changed", listener);
+  },
+  onScheduleFire: (cb) => {
+    const listener = (_e, data) => cb(data);
+    ipcRenderer.on("atlas:schedule-fire", listener);
+    return () => ipcRenderer.removeListener("atlas:schedule-fire", listener);
+  },
   onActivity: (cb) => {
     const listener = (_e, data) => cb(data);
     ipcRenderer.on("atlas:activity", listener);
     return () => ipcRenderer.removeListener("atlas:activity", listener);
+  },
+  /* ─── کانکتورهای MCP ─── */
+  mcp: {
+    list: () => ipcRenderer.invoke("atlas:mcp-list"),
+    tools: (serverId) => ipcRenderer.invoke("atlas:mcp-tools", { serverId }),
+    toolsAll: () => ipcRenderer.invoke("atlas:mcp-tools-all"),
+    test: (serverId) => ipcRenderer.invoke("atlas:mcp-test", { serverId }),
+    call: (serverId, tool, args) => ipcRenderer.invoke("atlas:mcp-call", { serverId, tool, args }),
+    disconnect: (serverId) => ipcRenderer.invoke("atlas:mcp-disconnect", { serverId }),
   },
 });

@@ -5,7 +5,7 @@ import { Welcome } from '@/components/Welcome'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import {
   applyTheme, useSettingsStore,
-  getModelSettings, engineLabel, activeModelName
+  getTaskConfig, engineLabel
 } from '@/stores/settingsStore'
 import {
   useConversationsStore, useMessagesStore
@@ -124,6 +124,19 @@ function App(): React.JSX.Element {
       useActivityStore.getState().push(formatBackendActivity(d))
     })
     return off
+  }, [])
+
+  /* ─── باز کردن نتیجهٔ کار پس‌زمینه در چت (از پنل کارها) ─── */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const text = (e as CustomEvent<{ text: string }>).detail?.text
+      if (!text) return
+      try {
+        runtimeRef.current.thread.append(text)
+      } catch { /* ignore */ }
+    }
+    window.addEventListener('atlas:open-task-in-chat', handler)
+    return () => window.removeEventListener('atlas:open-task-in-chat', handler)
   }, [])
 
   /* ─── اجراکنندهٔ تسک‌های زمان‌بندی‌شده ─── */
@@ -332,16 +345,17 @@ function App(): React.JSX.Element {
   )
 }
 
-/** دنبالکردن تنظیمات موتور برای نشان نوار بالا */
+/** دنبالکردن تنظیمات موتور برای نشان نوار بالا — موتور «چت متنی» */
 function useEngineInfo(): string {
   const [label, setLabel] = useState(() => {
-    const s = getModelSettings()
-    return engineLabel(s.provider, activeModelName(s))
+    const cfg = getTaskConfig('text-chat')
+    return engineLabel(cfg.provider, cfg.model)
   })
   useEffect(() => {
     const sync = (): void => {
       const s = useSettingsStore.getState()
-      setLabel(engineLabel(s.provider, activeModelName(s)))
+      const cfg = s.taskConfigs['text-chat']
+      setLabel(engineLabel(cfg.provider, cfg.model))
       applyTheme(s.theme)
     }
     sync()

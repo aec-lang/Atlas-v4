@@ -475,12 +475,41 @@ function registerBackend() {
     return { ok: true, planMode };
   });
 
-  ipcMain.handle("atlas:proxy", async (_e, { url, method = "GET", headers = {}, body } = {}) => {
+  /* ─── فایل providers.json — کانفیگ پرووایدرها (قابل ویرایش دستی، مثل OpenCode) ─── */
+  const providersPath = () => path.join(app.getPath("userData"), "providers.json");
+  ipcMain.handle("atlas:providers-read", async () => {
     try {
+      const raw = await fsp.readFile(providersPath(), "utf8");
+      return { ok: true, content: raw, path: providersPath() };
+    } catch (err) {
+      if (err && err.code === "ENOENT") return { ok: true, content: null, path: providersPath() };
+      return { ok: false, error: err && err.message ? err.message : String(err) };
+    }
+  });
+  ipcMain.handle("atlas:providers-write", async (_e, { content } = {}) => {
+    try {
+      if (typeof content !== "string" || content.length > 1000000) {
+        return { ok: false, error: "محتوای نامعتبر" };
+      }
+      JSON.parse(content); // اعتبارسنجی JSON قبل از نوشتن
+      await fsp.writeFile(providersPath(), content, "utf8");
+      return { ok: true, path: providersPath() };
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle("atlas:proxy", async (_e, { url, method = "GET", headers = {}, body, responseType } = {}) => {    try {
       const m = String(method || "GET").toUpperCase();
       const init = { method: m, headers };
       if (m !== "GET" && body !== undefined) init.body = body; // body روی GET غیرمجاز است
       const res = await fetch(url, init);
+      // responseType: 'base64' برای پاسخ‌های باینری (مثل صوت TTS) — بدنه base64 برمی‌گردد
+      if (responseType === "base64") {
+        const buf = Buffer.from(await res.arrayBuffer());
+        const ct = res.headers.get("content-type") || undefined;
+        return { ok: true, status: res.status, body: buf.toString("base64"), base64: true, contentType: ct };
+      }
       const text = await res.text();
       return { ok: true, status: res.status, body: text };
     } catch (err) {
