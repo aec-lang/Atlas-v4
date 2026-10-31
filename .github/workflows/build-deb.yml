@@ -1,0 +1,42 @@
+name: Build Linux DEB
+
+# Builds the .deb package for Atlas and attaches it to the existing v4.1.0 release.
+# Triggered manually only (workflow_dispatch) so pushing this file does not
+# start a full multi-OS build. Mirrors build.yml (Node 22, npm install because
+# package-lock.json is not pushed) plus the maintainer override the .deb
+# target requires (package.json has no author email).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Type-check & build web bundle
+        run: npm run build
+
+      - name: Build DEB
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npx electron-builder --linux deb --config.linux.maintainer="alavi8940-tech" --publish never
+
+      - name: Upload DEB to v4.1.0 release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload v4.1.0 release/*.deb --clobber
