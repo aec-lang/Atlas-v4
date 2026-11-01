@@ -1,7 +1,7 @@
 {
   "name": "atlas-v4",
   "private": true,
-  "version": "4.1.0",
+  "version": "4.2.0",
   "type": "module",
   "description": "Atlas — دستیار هوشمند محلی با رابط شیشه‌ای فارسی",
   "main": "desktop/main.cjs",

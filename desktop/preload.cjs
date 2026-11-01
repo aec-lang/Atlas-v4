@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld("atlasAPI", {
   setConfirm: (enabled) => ipcRenderer.invoke("atlas:set-confirm", enabled),
   setPlan: (enabled) => ipcRenderer.invoke("atlas:set-plan", enabled),
   proxy: (opts) => ipcRenderer.invoke("atlas:proxy", opts),
+  /** اعمال پروکسی شبکه روی سشن الکترون (قوانین از رندرر ساخته می‌شود) */
+  setNetworkProxy: (opts) => ipcRenderer.invoke("atlas:set-network-proxy", opts),
   /** فایل providers.json در app-data (خواندن/نوشتن کانفیگ پرووایدرها) */
   providersRead: () => ipcRenderer.invoke("atlas:providers-read"),
   providersWrite: (content) => ipcRenderer.invoke("atlas:providers-write", { content }),

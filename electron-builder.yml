@@ -8,6 +8,7 @@ files:
   - desktop/main.cjs
   - desktop/preload.cjs
   - desktop/backend.cjs
+  - desktop/netProxy.cjs
   - desktop/tasks.cjs
   - desktop/mcp.cjs
 electronLanguages:

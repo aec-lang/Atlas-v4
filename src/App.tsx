@@ -13,6 +13,7 @@ import {
 import type { ProviderKind } from '@/stores/settingsStore'
 import { AssistantRuntimeProvider } from '@assistant-ui/react'
 import { useAtlasRuntime } from '@/lib/atlasRuntime'
+import { applyNetworkProxy } from '@/lib/proxyConfig'
 import { AgentActivityPanel } from '@/components/AgentActivityPanel'
 import { InternalBrowser } from '@/components/InternalBrowser'
 import { TerminalPanel } from '@/components/TerminalPanel'
@@ -70,6 +71,11 @@ function App(): React.JSX.Element {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [runtime])
+
+  /* ─── اعمال پروکسی ذخیره‌شده روی سشن الکترون در استارت (فقط دسکتاپ) ─── */
+  useEffect(() => {
+    void applyNetworkProxy(useSettingsStore.getState().proxy)
+  }, [])
 
   /* ─── هندلرهای رویداد برای پالت فرمان و دکمه‌ها ─── */
   useEffect(() => {

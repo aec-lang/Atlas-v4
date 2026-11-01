@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { DEFAULT_NETWORK_PROXY, type NetworkProxyConfig } from '@/lib/proxyConfig'
 
 export type ThemeName =
   | 'midnight' | 'aurora' | 'paper' | 'lavender'
@@ -266,6 +267,9 @@ interface SettingsState extends ModelSettings {
   /** عبارت بیدار برای حالت صوتی (wake word) */
   wakePhrase: string
   setWakePhrase: (v: string) => void
+  /** پروکسی شبکهٔ داخل برنامه — HTTP/SOCKS ساده، بدون vless */
+  proxy: NetworkProxyConfig
+  setProxy: (patch: Partial<NetworkProxyConfig>) => void
   /** بهروزرسانی جزئی تنظیمات مدل */
   setModel: (patch: Partial<ModelSettings>) => void
   /** برگرداندن تنظیمات مدل به پیشفرض */
@@ -305,6 +309,8 @@ export const useSettingsStore = create<SettingsState>()(
       setSyncToken: v => set({ syncToken: v }),
       wakePhrase: "atlas",
       setWakePhrase: v => set({ wakePhrase: v }),
+      proxy: { ...DEFAULT_NETWORK_PROXY },
+      setProxy: patch => set(s => ({ proxy: { ...s.proxy, ...patch } })),
       setModel: patch => set(patch),
       resetModel: () => set({ ...DEFAULT_MODEL_SETTINGS }),
       taskConfigs: defaultTaskConfigs(DEFAULT_MODEL_SETTINGS),
@@ -320,7 +326,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'atlas-settings',
-      version: 4,
+      version: 5,
       migrate: (persistedState, version) => {
         const p = (persistedState ?? {}) as Partial<SettingsState>
         // نسخه‌های قدیمی taskConfigs ندارند — از تنظیمات سراسری ذخیره‌شده بساز
@@ -352,6 +358,10 @@ export const useSettingsStore = create<SettingsState>()(
           }
           return { ...p, taskConfigs: cfgs } as SettingsState
         }
+        // نسخه ۵: پروکسی شبکه — اگر جاافتاده باشد با پیش‌فرض پر شود
+        if (version < 5) {
+          return { ...p, proxy: { ...DEFAULT_NETWORK_PROXY, ...(p.proxy ?? {}) } } as SettingsState
+        }
         return p as SettingsState
       },
       // orbState گذراست و نباید ذخیره شود
@@ -377,7 +387,8 @@ export const useSettingsStore = create<SettingsState>()(
         syncMode: s.syncMode,
         syncEndpoint: s.syncEndpoint,
         syncToken: s.syncToken,
-        wakePhrase: s.wakePhrase
+        wakePhrase: s.wakePhrase,
+        proxy: s.proxy
       })
     }
   )

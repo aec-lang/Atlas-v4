@@ -2,11 +2,12 @@
  * Atlas Desktop — پروسهٔ اصلی الکترون
  * بدون منوی پیشفرض، لینکهای خارجی در مرورگر سیستم، زمینهٔ ایزوله
  */
-const { app, BrowserWindow, shell, Menu, ipcMain, desktopCapturer, Tray } = require('electron')
+const { app, BrowserWindow, shell, Menu, ipcMain, desktopCapturer, Tray, session } = require('electron')
 const path = require('node:path')
 const { registerBackend } = require('./backend.cjs')
 const { registerTasks } = require('./tasks.cjs')
 const { registerMcp } = require('./mcp.cjs')
+const { setNetProxy } = require('./netProxy.cjs')
 
 /** اسکرین‌شات واقعی از صفحه (در پروسهٔ اصلی؛ sandbox اجازهٔ DOM در preload را نمیدهد) */
 function registerScreenCapture() {
@@ -111,8 +112,40 @@ function createWindow() {
   })
 }
 
+/* ─── پروکسی شبکه: قوانین از رندرر می‌آید و روی سشن پیشفرض اعمال می‌شود ─── */
+/** اعتبار احراز هویت پروکسی — فقط در حافظهٔ پروسهٔ اصلی نگه داشته می‌شود */
+let proxyCreds = null
+
+function registerNetworkProxy() {
+  ipcMain.handle('atlas:set-network-proxy', async (_e, opts = {}) => {
+    try {
+      const ses = session.defaultSession
+      if (opts && opts.rules) {
+        await ses.setProxy({ mode: 'fixed_servers', proxyRules: opts.rules, proxyBypassRules: '<local>' })
+        setNetProxy({ rules: opts.rules, username: opts.username, password: opts.password })
+        proxyCreds = { username: opts.username || '', password: opts.password || '' }
+      } else {
+        await ses.setProxy({ mode: 'system' })
+        setNetProxy(null)
+        proxyCreds = null
+      }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : String(err) }
+    }
+  })
+  // احراز هویت پروکسی (HTTP/SOCKS با یوزر و پسورد) — فقط وقتی اعتبار ذخیره شده باشد
+  app.on('login', (event, _webContents, _details, authInfo, callback) => {
+    if (authInfo && authInfo.isProxy && proxyCreds && proxyCreds.username) {
+      event.preventDefault()
+      callback(proxyCreds.username, proxyCreds.password)
+    }
+  })
+}
+
 app.whenReady().then(() => {
   registerBackend()
+  registerNetworkProxy()
   registerScreenCapture()
   registerTasks()
   registerMcp()

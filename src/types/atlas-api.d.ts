@@ -172,6 +172,8 @@ export interface AtlasAPI {
   setPlan?: (enabled: boolean) => void
   /** پروکسی درخواستهای شبکه از پروسهٔ اصلی (کلیدها از مرورگر خارج نمیشوند) */
   proxy?: (opts: ProxyOptions) => Promise<ProxyResult>
+  /** اعمال پروکسی شبکه روی سشن الکترون (فقط دسکتاپ) — null یعنی برگشت به پروکسی سیستم */
+  setNetworkProxy?: (opts: { rules: string; username?: string; password?: string } | null) => Promise<{ ok: boolean; error?: string }>
   /** خواندن فایل providers.json از app-data (فقط دسکتاپ) */
   providersRead?: () => Promise<{ ok: boolean; content?: string | null; path?: string; error?: string }>
   /** نوشتن فایل providers.json در app-data (فقط دسکتاپ) */

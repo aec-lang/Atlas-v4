@@ -9,6 +9,7 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const os = require("node:os");
 const { exec, spawn } = require("node:child_process");
+const { netFetch } = require("./netProxy.cjs");
 
 const MAX_OUTPUT = 200000;
 const MAX_FILE_READ = 400000;
@@ -503,7 +504,7 @@ function registerBackend() {
       const m = String(method || "GET").toUpperCase();
       const init = { method: m, headers };
       if (m !== "GET" && body !== undefined) init.body = body; // body روی GET غیرمجاز است
-      const res = await fetch(url, init);
+      const res = await netFetch(url, init);
       // responseType: 'base64' برای پاسخ‌های باینری (مثل صوت TTS) — بدنه base64 برمی‌گردد
       if (responseType === "base64") {
         const buf = Buffer.from(await res.arrayBuffer());

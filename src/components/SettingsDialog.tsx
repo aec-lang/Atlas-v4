@@ -29,6 +29,7 @@ import {
 } from '@/stores/settingsStore'
 import { templatesFor, applyTemplate, type ProviderTemplate } from '@/lib/providerTemplates'
 import { writeProvidersFile, applyProvidersFile } from '@/lib/providerFile'
+import { applyNetworkProxy, isValidNetworkProxy, type NetworkProxyConfig, type ProxyType } from '@/lib/proxyConfig'
 
 const PROVIDERS: Array<{ id: ProviderKind; name: string; desc: string }> = [
   { id: 'ollama', name: 'Ollama (محلی)', desc: 'مدل روی دستگاه خودت — کاملاً خصوصی' },
@@ -544,6 +545,43 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const toast = useToastStore(st => st.push)
   const [test, setTest] = useState<TestState>({ status: 'idle' })
   const [confirmDangerous, setConfirmDangerous] = useState(true)
+  const [proxyTest, setProxyTest] = useState<TestState>({ status: 'idle' })
+  /** نسخهٔ دسکتاپ؟ — در مرورگر تنظیم پروکسی اعمال نمی‌شود */
+  const isDesktopProxy = typeof window !== 'undefined' && !!window.atlasAPI?.setNetworkProxy
+
+  /** اعمال فوری پروکسی (تاگل روشن/خاموش) */
+  const applyProxyNow = useCallback(async (cfg: NetworkProxyConfig): Promise<void> => {
+    if (cfg.enabled && !isValidNetworkProxy(cfg)) {
+      toast('پروکسی فعال شد ولی هاست/پورت معتبر نیست — اول آن‌ها را کامل کن', 'error')
+      return
+    }
+    const r = await applyNetworkProxy(cfg)
+    if (!r.ok && cfg.enabled) toast(`پروکسی اعمال نشد: ${r.error ?? 'نامشخص'}`, 'error')
+  }, [toast])
+
+  /** اعمال + تست اتصال واقعی از روی پروکسی (generate_204 گوگل، انتظار 204) */
+  const runProxyTest = (): void => {
+    if (!isValidNetworkProxy(s.proxy)) {
+      setProxyTest({ status: 'fail', message: 'هاست و پورت معتبر وارد کن' })
+      return
+    }
+    setProxyTest({ status: 'testing' })
+    void (async () => {
+      const r = await applyNetworkProxy(s.proxy)
+      if (!r.ok) {
+        setProxyTest({ status: 'fail', message: r.error ?? 'اعمال نشد' })
+        return
+      }
+      try {
+        const res = await fetch('https://www.gstatic.com/generate_204', { signal: withTimeout(8000) })
+        setProxyTest(res.status === 204
+          ? { status: 'ok', message: 'پروکسی وصل است ✓' }
+          : { status: 'fail', message: `HTTP ${res.status} — پروکسی جواب غیرمنتظره داد` })
+      } catch (e) {
+        setProxyTest({ status: 'fail', message: e instanceof Error ? e.message.slice(0, 120) : 'خطا در تست پروکسی' })
+      }
+    })()
+  }
 
   /** نوشتن کانفیگ فعلی در providers.json */
   const onExportProviders = useCallback(async (): Promise<void> => {
@@ -761,6 +799,97 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           {TASKS.map(t => <TaskRow key={t.id} task={t.id} />)}
         </div>
 
+        {/* ─── پروکسی شبکه ─── */}
+        <div className="grid gap-2 rounded-2xl p-3 glass">
+          <div className="flex items-center justify-between gap-3">
+            <div className="grid gap-0.5">
+              <span className="text-sm font-medium">پروکسی شبکه</span>
+              <span className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                همهٔ تماس‌های API اطلس (چت، لیست مدل‌ها، ابزارها) از این پروکسی رد می‌شوند — بدون نیاز به VPN سیستمی. فقط HTTP و SOCKS ساده؛ vless و سابسکریپشن پشتیبانی نمی‌شود.
+              </span>
+            </div>
+            <button
+              role="switch"
+              aria-checked={s.proxy.enabled}
+              onClick={() => {
+                const next = !s.proxy.enabled
+                s.setProxy({ enabled: next })
+                void applyProxyNow({ ...s.proxy, enabled: next })
+              }}
+              className="relative h-6 w-11 shrink-0 rounded-full transition-colors"
+              style={{ background: s.proxy.enabled ? 'var(--accent)' : 'rgba(128,128,128,0.3)' }}
+              title="پروکسی شبکه"
+            >
+              <span
+                className="absolute top-0.5 size-5 rounded-full bg-white transition-all duration-200"
+                style={{ insetInlineStart: s.proxy.enabled ? '22px' : '2px' }}
+              />
+            </button>
+          </div>
+          {s.proxy.enabled && (
+            <>
+              <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>نوع پروکسی</label>
+              <Select value={s.proxy.type} onValueChange={v => s.setProxy({ type: v as ProxyType })}>
+                <SelectTrigger size="sm" className="rounded-xl border-none text-xs"
+                  style={{ background: 'rgba(128,128,128,0.08)', color: 'var(--text-primary)' }}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="socks5" className="text-xs">SOCKS5</SelectItem>
+                  <SelectItem value="http" className="text-xs">HTTP</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="grid gap-1">
+                  <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>هاست</label>
+                  <input dir="ltr" value={s.proxy.host}
+                    onChange={e => s.setProxy({ host: e.target.value })}
+                    className={inputCls} style={inputStyle}
+                    placeholder="127.0.0.1" />
+                </div>
+                <div className="grid gap-1">
+                  <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>پورت</label>
+                  <input dir="ltr" inputMode="numeric" value={s.proxy.port}
+                    onChange={e => s.setProxy({ port: e.target.value })}
+                    className={inputCls} style={inputStyle}
+                    placeholder="1080" />
+                </div>
+              </div>
+              <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>نام کاربری (اختیاری)</label>
+              <input dir="ltr" value={s.proxy.username}
+                onChange={e => s.setProxy({ username: e.target.value })}
+                className={inputCls} style={inputStyle}
+                placeholder="فقط اگر پروکسی احراز هویت می‌خواهد" />
+              <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>رمز (اختیاری)</label>
+              <input dir="ltr" type="password" value={s.proxy.password}
+                onChange={e => s.setProxy({ password: e.target.value })}
+                className={inputCls} style={inputStyle} />
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={runProxyTest}
+                  disabled={proxyTest.status === 'testing' || !isValidNetworkProxy(s.proxy)}
+                  className="gap-1.5 rounded-xl text-xs">
+                  {proxyTest.status === 'testing' ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
+                  {proxyTest.status === 'testing' ? 'در حال تست...' : 'اعمال و تست'}
+                </Button>
+                {proxyTest.status !== 'idle' && proxyTest.status !== 'testing' && (
+                  <span className={`flex items-center gap-1 text-xs ${proxyTest.status === 'ok' ? 'text-green-400' : 'text-red-400'}`}>
+                    {proxyTest.status === 'ok' ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                    {proxyTest.message}
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                💡 آدرس‌های محلی (localhost) از پروکسی رد نمی‌شوند — Ollama محلی مستقیم وصل می‌شود.
+              </p>
+            </>
+          )}
+          {!isDesktopProxy && (
+            <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              در نسخهٔ مرورگر پروکسی اعمال نمی‌شود — این تنظیم فقط در نسخهٔ دسکتاپ کار می‌کند.
+            </p>
+          )}
+        </div>
+
         {/* ─── پرامپت سیستم ─── */}
         <div className="grid gap-2 rounded-2xl p-3 glass">
           <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>پرامپت سیستم</label>
@@ -875,7 +1004,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             {test.status === 'testing' ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
             {test.status === 'testing' ? 'در حال تست...' : 'تست اتصال'}
           </Button>
-          <Button size="sm" onClick={() => onOpenChange(false)}
+          <Button size="sm" onClick={() => { void applyNetworkProxy(s.proxy); onOpenChange(false) }}
             className="rounded-xl text-xs text-white" style={{ background: 'var(--accent)' }}>
             ذخیره و بستن
           </Button>
