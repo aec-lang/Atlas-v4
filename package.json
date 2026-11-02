@@ -10,7 +10,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run",
-    "test:updater": "node --test tests/updater.test.cjs",
+    "test:updater": "node --test tests/updater-checks.cjs",
     "preview": "vite preview",
     "dist": "vite build",
     "app": "electron .",
