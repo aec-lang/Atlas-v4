@@ -41,6 +41,7 @@ jobs:
           done
           ATLAS_PLAYWRIGHT_MODULE="$RUNNER_TEMP/atlas-readme-tools/node_modules/playwright/index.mjs" node scripts/capture-readme.mjs
       - name: Upload screenshot artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: readme-screenshots

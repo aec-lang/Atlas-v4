@@ -11,7 +11,7 @@ try {
   await page.getByRole('heading', { name: 'چطور میتونم کمک کنم؟' }).waitFor()
   await page.evaluate(() => document.fonts.ready)
   await page.screenshot({ path: `${output}/home-dark.png`, animations: 'disabled' })
-  await page.getByRole('button', { name: 'تنظیمات', exact: true }).click()
+  await page.keyboard.press('Control+,')
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('button', { name: /^OpenAI/ }).click()
   await dialog.screenshot({ path: `${output}/api-setup.png`, animations: 'disabled' })
