@@ -272,6 +272,8 @@ interface SettingsState extends ModelSettings {
   setProxy: (patch: Partial<NetworkProxyConfig>) => void
   /** بهروزرسانی جزئی تنظیمات مدل */
   setModel: (patch: Partial<ModelSettings>) => void
+  /** ذخیرهٔ اتصال چت و هماهنگ کردن نمایش سراسری در یک تغییر */
+  setChatConnection: (config: TaskConfig) => void
   /** برگرداندن تنظیمات مدل به پیشفرض */
   resetModel: () => void
   /** کانفیگ هر کار (چت متنی، چت صوتی، تصویر، ویدیو، سه‌بعدی، TTS) */
@@ -312,6 +314,16 @@ export const useSettingsStore = create<SettingsState>()(
       proxy: { ...DEFAULT_NETWORK_PROXY },
       setProxy: patch => set(s => ({ proxy: { ...s.proxy, ...patch } })),
       setModel: patch => set(patch),
+      setChatConnection: config => set(s => {
+        const model: Partial<ModelSettings> = { provider: config.provider }
+        switch (config.provider) {
+          case 'openai': Object.assign(model, { apiBaseURL: config.baseURL, apiKey: config.apiKey, apiModel: config.model }); break
+          case 'ollama': Object.assign(model, { ollamaBaseURL: config.baseURL, ollamaModel: config.model }); break
+          case 'anthropic': Object.assign(model, { anthropicApiKey: config.apiKey, anthropicModel: config.model }); break
+          case 'gemini': Object.assign(model, { geminiBaseURL: config.baseURL, geminiApiKey: config.apiKey, geminiModel: config.model }); break
+        }
+        return { ...model, taskConfigs: { ...s.taskConfigs, 'text-chat': { ...config } } }
+      }),
       resetModel: () => set({ ...DEFAULT_MODEL_SETTINGS }),
       taskConfigs: defaultTaskConfigs(DEFAULT_MODEL_SETTINGS),
       setTaskConfig: (task, patch) =>

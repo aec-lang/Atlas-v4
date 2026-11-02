@@ -10,14 +10,28 @@ permissions:
   contents: write
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run tests
+        run: npm test
+
   build:
+    needs: verify
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            builder_args: --linux AppImage
-            artifact_name: Atlas-Linux-AppImage
+            builder_args: --linux AppImage deb --config.linux.maintainer=alavi8940-tech
+            artifact_name: Atlas-Linux
           - os: windows-latest
             builder_args: --win portable
             artifact_name: Atlas-Windows-Portable
@@ -36,9 +50,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        # NOTE: npm install (not ci) — package-lock.json is not pushed (API size limits),
-        # so CI resolves fresh from package.json.
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Type-check & build web bundle
         run: npm run build
@@ -52,7 +64,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: release/*
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.exe
+            release/*.dmg
           if-no-files-found: error
 
   release:

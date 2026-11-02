@@ -3,17 +3,18 @@
  * تغییرات نسبت به فاز ۱: حذف دما/حداکثر توکن/تایپ دستی نام مدل/حالت نمایش،
  * افزودن پروتکل Anthropic، فچ لیست مدلها از API با Dropdown شادکن.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { ConnectionSetup } from '@/components/ConnectionSetup'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select'
 import {
-  useSettingsStore, engineLabel, activeModelName,
+  useSettingsStore, engineLabel,
   TASKS, GEMINI_DEFAULT_BASE_URL, ANTHROPIC_DEFAULT_BASE_URL, providerProtocol
 } from '@/stores/settingsStore'
 import type { ProviderKind, TaskKind, TaskConfig } from '@/stores/settingsStore'
@@ -106,28 +107,31 @@ function ModelField(props: {
   const [models, setModels] = useState<CatalogModel[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
-  const [loadedOnce, setLoadedOnce] = useState(false)
+  const request = useRef(0)
 
   const load = useCallback(async () => {
+    const current = ++request.current
     setLoading(true)
     setErr('')
     try {
       const list = await fetchModelCatalog(protocol, conn)
+      if (current !== request.current) return
       setModels(list)
       if (list.length === 0) setErr('هیچ مدلی گزارش نشد — سرور را بررسی کن')
     } catch (e) {
-      setErr(e instanceof Error ? e.message.slice(0, 120) : 'خطا در گرفتن لیست مدلها')
+      if (current === request.current) setErr(e instanceof Error ? e.message.slice(0, 120) : 'خطا در گرفتن لیست مدلها')
     } finally {
-      setLoading(false)
-      setLoadedOnce(true)
+      if (current === request.current) setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [protocol, conn.baseURL, conn.apiKey, conn.ollamaBaseURL])
 
-  // اولین ورود به پنل → فچ خودکار؛ بعدش فقط با دکمهٔ رفرش
   useEffect(() => {
-    if (!loadedOnce) void load()
-  }, [loadedOnce, load])
+    setModels([])
+    setErr('')
+    const timer = setTimeout(() => { void load() }, 600)
+    return () => { clearTimeout(timer); request.current++ }
+  }, [load])
 
   // اگر مقدار فعلی در لیست نیست (مثلاً قبل از فچ)، موقتاً به لیست اضافه کن تا نمایش نپرد
   const items = useMemo(() => {
@@ -411,8 +415,14 @@ function CustomProviderForm({ task }: { task: TaskKind }): React.JSX.Element {
 
 function TaskRow({ task }: { task: TaskKind }): React.JSX.Element {
   const cfg = useSettingsStore(s => s.taskConfigs[task])
-  const setTaskConfig = useSettingsStore(s => s.setTaskConfig)
+  const setTaskConfig = (id: TaskKind, patch: Partial<TaskConfig>) => {
+    const store = useSettingsStore.getState()
+    if (id === 'text-chat') store.setChatConnection({ ...store.taskConfigs[id], ...patch })
+    else store.setTaskConfig(id, patch)
+    setTest({ status: 'idle' })
+  }
   const [test, setTest] = useState<TestState>({ status: 'idle' })
+  const [expanded, setExpanded] = useState(false)
   const meta = TASKS.find(t => t.id === task) ?? TASKS[0]
 
   const protocol = providerProtocol(cfg.provider)
@@ -424,7 +434,7 @@ function TaskRow({ task }: { task: TaskKind }): React.JSX.Element {
 
   const onProviderChange = (v: string): void => {
     const p = v as ProviderKind
-    const patch: Partial<TaskConfig> = { provider: p }
+    const patch: Partial<TaskConfig> = { provider: p, model: '', apiKey: '', baseURL: p === 'ollama' ? 'http://localhost:11434/v1' : p === 'gemini' ? GEMINI_DEFAULT_BASE_URL : p === 'anthropic' ? ANTHROPIC_DEFAULT_BASE_URL : 'https://api.openai.com/v1' }
     if (p === 'gemini' && !cfg.baseURL.trim()) patch.baseURL = GEMINI_DEFAULT_BASE_URL
     if (p === 'ollama' && !cfg.baseURL.trim()) patch.baseURL = 'http://localhost:11434/v1'
     if (p === 'custom' && !cfg.custom) patch.custom = normalizeCustomJob()
@@ -448,14 +458,16 @@ function TaskRow({ task }: { task: TaskKind }): React.JSX.Element {
   const inputStyle = { color: 'var(--text-primary)', background: 'rgba(128,128,128,0.08)' }
 
   return (
-    <div className="grid gap-2 rounded-2xl p-3 glass">
-      <div className="flex items-center justify-between gap-2">
+    <details className="rounded-2xl p-3 glass" open={expanded} onToggle={e => setExpanded(e.currentTarget.open)}>
+      <summary className="cursor-pointer text-sm">
+      <span className="inline-flex w-[95%] flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium">{meta.name}</span>
         <span className="font-mono text-[10px]" dir="ltr" style={{ color: 'var(--text-secondary)' }}>
           {engineLabel(cfg.provider, cfg.model, cfg.custom?.name)}
         </span>
-      </div>
-
+      </span>
+      </summary>
+      {expanded && <div className="mt-3 grid gap-2">
       <Select value={cfg.provider} onValueChange={onProviderChange}>
         <SelectTrigger size="sm" className="rounded-xl border-none text-xs"
           style={{ background: 'rgba(128,128,128,0.08)', color: 'var(--text-primary)' }}>
@@ -534,7 +546,8 @@ function TaskRow({ task }: { task: TaskKind }): React.JSX.Element {
           )}
         </div>
       )}
-    </div>
+      </div>}
+    </details>
   )
 }
 
@@ -543,9 +556,11 @@ function TaskRow({ task }: { task: TaskKind }): React.JSX.Element {
 export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const s = useSettingsStore()
   const toast = useToastStore(st => st.push)
-  const [test, setTest] = useState<TestState>({ status: 'idle' })
+  const [section, setSection] = useState<'connection' | 'advanced'>('connection')
+  const chat = s.taskConfigs['text-chat']
   const [confirmDangerous, setConfirmDangerous] = useState(true)
   const [proxyTest, setProxyTest] = useState<TestState>({ status: 'idle' })
+  useEffect(() => { if (open) setSection('connection') }, [open])
   /** نسخهٔ دسکتاپ؟ — در مرورگر تنظیم پروکسی اعمال نمی‌شود */
   const isDesktopProxy = typeof window !== 'undefined' && !!window.atlasAPI?.setNetworkProxy
 
@@ -608,152 +623,28 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     window.atlasAPI?.setConfirm?.(next)
   }
 
-  const activeBase =
-    s.provider === 'ollama' ? s.ollamaBaseURL :
-    s.provider === 'anthropic' ? ANTHROPIC_DEFAULT_BASE_URL :
-    s.provider === 'gemini' ? (s.geminiBaseURL.trim() || GEMINI_DEFAULT_BASE_URL) : s.apiBaseURL
-  const activeKey =
-    s.provider === 'anthropic' ? s.anthropicApiKey :
-    s.provider === 'gemini' ? s.geminiApiKey :
-    s.provider === 'openai' ? s.apiKey : ''
-  const activeModel = activeModelName(s)
-
-  const conn = useMemo(() => ({
-    baseURL: s.provider === 'ollama' ? '' : activeBase,
-    apiKey: activeKey,
-    ollamaBaseURL: s.provider === 'ollama' ? s.ollamaBaseURL : ''
-  }), [s.provider, s.apiBaseURL, s.apiKey, s.anthropicApiKey, s.geminiApiKey, s.ollamaBaseURL, activeBase, activeKey])
-
-  const runTest = (): void => {
-    if (!activeModel.trim()) {
-      setTest({ status: 'fail', message: 'اول یک مدل انتخاب کن' })
-      return
-    }
-    setTest({ status: 'testing' })
-    void testConnection(providerProtocol(s.provider), activeBase, activeKey, activeModel).then(setTest)
-  }
-
   const inputCls = 'rounded-xl bg-transparent px-3 py-2 font-mono text-xs outline-none'
   const inputStyle = { color: 'var(--text-primary)', background: 'rgba(128,128,128,0.08)' }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="glass-strong beam-border max-h-[86vh] overflow-y-auto rounded-[1.4rem] sm:max-w-lg" style={{ background: 'var(--bg-base)' }}>
+      <DialogContent dir="rtl" className="glass-strong beam-border max-h-[86vh] overflow-y-auto rounded-[1.4rem] sm:max-w-xl" style={{ background: 'var(--bg-base)' }}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-right">⚙️ تنظیمات Atlas</DialogTitle>
           <DialogDescription className="text-right">
-            موتور فعلی: <strong style={{ color: 'var(--accent)' }}>{engineLabel(s.provider, activeModel)}</strong>
+            موتور فعلی: <strong style={{ color: 'var(--accent)' }}>{engineLabel(chat.provider, chat.model, chat.custom?.name)}</strong>
           </DialogDescription>
         </DialogHeader>
 
-        {/* ─── انتخاب پروایدر ─── */}
-        <div className="grid gap-2">
-          {PROVIDERS.map(p => (
-            <button
-              key={p.id}
-              onClick={() => {
-                s.setModel({ provider: p.id })
-                // انتخاب جمینای با آدرس خالی → پر کردن پیشفرض عمومی
-                if (p.id === 'gemini' && !s.geminiBaseURL.trim()) {
-                  s.setModel({ geminiBaseURL: GEMINI_DEFAULT_BASE_URL })
-                }
-                setTest({ status: 'idle' })
-              }}
-              data-active={s.provider === p.id}
-              className="theme-card flex flex-row items-center gap-3 rounded-2xl p-3 text-right"
-              style={{
-                border: s.provider === p.id
-                  ? '1px solid color-mix(in srgb, var(--accent) 55%, transparent)'
-                  : '1px solid var(--glass-border)',
-                background: s.provider === p.id ? 'var(--accent-soft)' : 'var(--glass-bg)',
-                aspectRatio: 'auto',
-                height: 'auto'
-              }}
-            >
-              <span className="text-sm font-semibold">{p.name}</span>
-              <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{p.desc}</span>
-            </button>
-          ))}
+        <div className="grid grid-cols-2 gap-2" aria-label="بخش تنظیمات">
+          <Button variant={section === 'connection' ? 'default' : 'outline'} className="rounded-xl" aria-pressed={section === 'connection'} onClick={() => setSection('connection')}>اتصال هوش مصنوعی</Button>
+          <Button variant={section === 'advanced' ? 'default' : 'outline'} className="rounded-xl" aria-pressed={section === 'advanced'} onClick={() => setSection('advanced')}>تنظیمات پیشرفته</Button>
         </div>
-
-        {/* ─── Ollama ─── */}
-        {s.provider === 'ollama' && (
-          <div className="grid gap-2 rounded-2xl p-3 glass">
-            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>آدرس سرور</label>
-            <input dir="ltr" value={s.ollamaBaseURL}
-              onChange={e => s.setModel({ ollamaBaseURL: e.target.value })}
-              className={inputCls} style={inputStyle}
-              placeholder="http://localhost:11434/v1" />
-            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>مدل</label>
-            <ModelField protocol="ollama" value={s.ollamaModel}
-              onChange={id => s.setModel({ ollamaModel: id })}
-              conn={conn} />
-            <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              💡 اجرای سرور محلی: <code dir="ltr">ollama serve</code> — لیست مدلها از همین دکمهٔ ↻ گرفته میشود
-            </p>
-          </div>
-        )}
-
-        {/* ─── API سازگار OpenAI ─── */}
-        {s.provider === 'openai' && (
-          <div className="grid gap-2 rounded-2xl p-3 glass">
-            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>آدرس پایه</label>
-            <input dir="ltr" value={s.apiBaseURL}
-              onChange={e => s.setModel({ apiBaseURL: e.target.value })}
-              className={inputCls} style={inputStyle}
-              placeholder="https://api.openai.com/v1" />
-            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>کلید API</label>
-            <input dir="ltr" type="password" value={s.apiKey}
-              onChange={e => s.setModel({ apiKey: e.target.value })}
-              className={inputCls} style={inputStyle}
-              placeholder="sk-..." />
-            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>مدل</label>
-            <ModelField protocol="openai" value={s.apiModel}
-              onChange={id => s.setModel({ apiModel: id })}
-              conn={conn} />
-          </div>
-        )}
-
-        {/* ─── Anthropic ─── */}
-        {s.provider === 'anthropic' && (
-          <div className="grid gap-2 rounded-2xl p-3 glass">
-            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>کلید API</label>
-            <input dir="ltr" type="password" value={s.anthropicApiKey}
-              onChange={e => s.setModel({ anthropicApiKey: e.target.value })}
-              className={inputCls} style={inputStyle}
-              placeholder="sk-ant-..." />
-            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>مدل</label>
-            <ModelField protocol="anthropic" value={s.anthropicModel}
-              onChange={id => s.setModel({ anthropicModel: id })}
-              conn={conn} />
-            <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-               💡 کلید را از console.anthropic.com بگیر — روی نسخهٔ دسکتاپ درخواستها از پروسهٔ اصلی عبور میکنند (کلید در مرورگر دیده نمیشود)
-             </p>
-          </div>
-        )}
-
-        {/* ─── Gemini ─── */}
-        {s.provider === 'gemini' && (
-          <div className="grid gap-2 rounded-2xl p-3 glass">
-            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>آدرس پایه</label>
-            <input dir="ltr" value={s.geminiBaseURL}
-              onChange={e => s.setModel({ geminiBaseURL: e.target.value })}
-              className={inputCls} style={inputStyle}
-              placeholder={GEMINI_DEFAULT_BASE_URL} />
-            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>کلید API</label>
-            <input dir="ltr" type="password" value={s.geminiApiKey}
-              onChange={e => s.setModel({ geminiApiKey: e.target.value })}
-              className={inputCls} style={inputStyle}
-              placeholder="AIza-..." />
-            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>مدل</label>
-            <ModelField protocol="openai" value={s.geminiModel}
-              onChange={id => s.setModel({ geminiModel: id })}
-              conn={conn} />
-            <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              💡 کلید را از Google AI Studio بگیر — جمینای از نقطهٔ سازگار OpenAI استفاده میکند
-            </p>
-          </div>
-        )}
+        {section === 'connection' ? (
+          <ConnectionSetup onAdvanced={() => setSection('advanced')} onSaved={() => { toast('اتصال چت ذخیره شد', 'success'); onOpenChange(false) }} />
+        ) : (
+        <div className="grid gap-4">
+        <p className="text-xs leading-6" style={{ color: 'var(--text-secondary)' }}>تغییرات این بخش به‌صورت خودکار ذخیره می‌شوند. برای اتصال معمولی، از بخش «اتصال هوش مصنوعی» استفاده کن.</p>
 
         {/* ─── تنظیمات هر کار ─── */}
         <div className="grid gap-2">
@@ -785,15 +676,15 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                 onClick={() => s.resetTaskConfigs()}
                 className="flex items-center gap-1 text-[11px] underline-offset-2 hover:underline"
                 style={{ color: 'var(--text-secondary)' }}
-                title="بازنشانی هر ۶ کار از روی تنظیمات سراسری بالا"
+                title="جایگزینی تنظیمات هر ۶ کار با اتصال چت فعلی"
               >
                 <RotateCcw size={11} />
-                بازنشانی از تنظیمات سراسری
+                کپی اتصال چت برای همهٔ کارها
               </button>
             </div>
           </div>
           <p className="px-1 text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            هر کار می‌تواند پرووایدر، کلید و مدل خودش را داشته باشد — در اولین اجرا از تنظیمات سراسری بالا کپی شده‌اند.
+            برای هر کار می‌توانی سرویس و مدل جداگانه انتخاب کنی.
             فایل <span className="font-mono" dir="ltr">providers.json</span> را هم می‌توانی دستی ویرایش کنی (به سبک OpenCode)؛ در استارت بعدی خوانده می‌شود.
           </p>
           {TASKS.map(t => <TaskRow key={t.id} task={t.id} />)}
@@ -988,25 +879,12 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           </button>
         </div>
 
-        {/* ─── نتیجهٔ تست ─── */}
-        {test.status !== 'idle' && test.status !== 'testing' && (
-          <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ${
-            test.status === 'ok' ? 'text-green-400' : 'text-red-400'}`}
-            style={{ background: 'rgba(128,128,128,0.08)' }}>
-            {test.status === 'ok' ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-            <span>{test.message}</span>
-          </div>
+        </div>
         )}
-
-        <DialogFooter className="sm:justify-between">
-          <Button variant="outline" size="sm" onClick={runTest} disabled={test.status === 'testing'}
-            className="gap-1.5 rounded-xl text-xs">
-            {test.status === 'testing' ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
-            {test.status === 'testing' ? 'در حال تست...' : 'تست اتصال'}
-          </Button>
+        <DialogFooter>
           <Button size="sm" onClick={() => { void applyNetworkProxy(s.proxy); onOpenChange(false) }}
             className="rounded-xl text-xs text-white" style={{ background: 'var(--accent)' }}>
-            ذخیره و بستن
+            بستن
           </Button>
         </DialogFooter>
       </DialogContent>
