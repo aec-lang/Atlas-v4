@@ -11,6 +11,15 @@ files:
   - desktop/netProxy.cjs
   - desktop/tasks.cjs
   - desktop/mcp.cjs
+  - desktop/updater.cjs
+extraResources:
+  - from: desktop/package-type
+    to: package-type
+publish:
+  provider: github
+  owner: aec-lang
+  repo: Atlas-v4
+  releaseType: release
 electronLanguages:
   - en-US
 linux:
@@ -23,6 +32,13 @@ appImage:
 win:
   signAndEditExecutable: false
   target:
+    - nsis
     - portable
+nsis:
+  artifactName: Atlas-${version}-${arch}-Setup.exe
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  differentialPackage: true
 portable:
   artifactName: Atlas-${version}-${arch}.exe

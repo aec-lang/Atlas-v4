@@ -24,6 +24,7 @@ import { useScheduleStore, isTaskDue } from '@/stores/scheduleStore'
 import { ToolsPanel } from '@/components/ToolsPanel'
 import { CommandPalette } from '@/components/CommandPalette'
 import { Toaster } from '@/components/Toaster'
+import { useToastStore } from '@/stores/toastStore'
 import { VoiceChatPanel } from '@/components/VoiceChatPanel'
 import { VoiceOrbDemo } from '@/components/VoiceOrbDemo'
 import { PanelRightOpen, Sparkles, Bot, Globe, Terminal, Wrench, Search, Mic } from 'lucide-react'
@@ -43,6 +44,18 @@ function App(): React.JSX.Element {
   const panel = useUiStore((s) => s.panel)
   const setPanel = useUiStore((s) => s.setPanel)
   const [toolsOpen, setToolsOpen] = useState(false)
+
+  useEffect(() => {
+    const updates = window.atlasAPI?.updates
+    if (!updates) return
+    let notified = ''
+    return updates.onState(state => {
+      if (state.status === 'available' && state.version && notified !== state.version) {
+        notified = state.version
+        useToastStore.getState().push(`نسخهٔ ${state.version} آماده است؛ از تنظیمات ← به‌روزرسانی دریافت کن.`, 'success')
+      }
+    })
+  }, [])
 
   const conversations = useConversationsStore(s => s.conversations)
   const activeId = useConversationsStore(s => s.activeId)

@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ConnectionSetup } from '@/components/ConnectionSetup'
+import { UpdatePanel } from '@/components/UpdatePanel'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select'
@@ -556,7 +557,7 @@ function TaskRow({ task }: { task: TaskKind }): React.JSX.Element {
 export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const s = useSettingsStore()
   const toast = useToastStore(st => st.push)
-  const [section, setSection] = useState<'connection' | 'advanced'>('connection')
+  const [section, setSection] = useState<'connection' | 'advanced' | 'updates'>('connection')
   const chat = s.taskConfigs['text-chat']
   const [confirmDangerous, setConfirmDangerous] = useState(true)
   const [proxyTest, setProxyTest] = useState<TestState>({ status: 'idle' })
@@ -636,13 +637,14 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-2" aria-label="بخش تنظیمات">
+        <div className="grid grid-cols-3 gap-2" aria-label="بخش تنظیمات">
           <Button variant={section === 'connection' ? 'default' : 'outline'} className="rounded-xl" aria-pressed={section === 'connection'} onClick={() => setSection('connection')}>اتصال هوش مصنوعی</Button>
           <Button variant={section === 'advanced' ? 'default' : 'outline'} className="rounded-xl" aria-pressed={section === 'advanced'} onClick={() => setSection('advanced')}>تنظیمات پیشرفته</Button>
+          <Button variant={section === 'updates' ? 'default' : 'outline'} className="rounded-xl" aria-pressed={section === 'updates'} onClick={() => setSection('updates')}>به‌روزرسانی</Button>
         </div>
         {section === 'connection' ? (
           <ConnectionSetup onAdvanced={() => setSection('advanced')} onSaved={() => { toast('اتصال چت ذخیره شد', 'success'); onOpenChange(false) }} />
-        ) : (
+        ) : section === 'updates' ? <UpdatePanel /> : (
         <div className="grid gap-4">
         <p className="text-xs leading-6" style={{ color: 'var(--text-secondary)' }}>تغییرات این بخش به‌صورت خودکار ذخیره می‌شوند. برای اتصال معمولی، از بخش «اتصال هوش مصنوعی» استفاده کن.</p>
 

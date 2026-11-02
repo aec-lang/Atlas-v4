@@ -14,6 +14,17 @@ async function captureScreen() {
 
 contextBridge.exposeInMainWorld("atlasAPI", {
   platform: process.platform,
+  updates: {
+    state: () => ipcRenderer.invoke("atlas:update-state"),
+    check: () => ipcRenderer.invoke("atlas:update-check"),
+    download: () => ipcRenderer.invoke("atlas:update-download"),
+    install: () => ipcRenderer.invoke("atlas:update-install"),
+    onState: (cb) => {
+      const listener = (_event, state) => cb(state);
+      ipcRenderer.on("atlas:update-state", listener);
+      return () => ipcRenderer.removeListener("atlas:update-state", listener);
+    },
+  },
   invokeTool: (tool, args) => ipcRenderer.invoke("atlas:tool", { tool, args }),
   captureScreen,
   openExternal: (url) => ipcRenderer.send("atlas:open-external", url),

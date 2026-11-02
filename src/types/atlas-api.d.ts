@@ -159,7 +159,30 @@ export interface McpAPI {
   disconnect: (serverId: string) => Promise<{ ok: boolean; error?: string }>
 }
 
+export interface UpdateState {
+  status: 'unsupported' | 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'downloaded' | 'error'
+  supported: boolean
+  currentVersion: string
+  version: string | null
+  percent: number
+  transferred: number
+  total: number
+  bytesPerSecond: number
+  message: string
+  releasesURL: string
+  differential: boolean
+}
+
+export interface UpdateAPI {
+  state: () => Promise<UpdateState>
+  check: () => Promise<UpdateState>
+  download: () => Promise<UpdateState>
+  install: () => Promise<UpdateState>
+  onState: (callback: (state: UpdateState) => void) => () => void
+}
+
 export interface AtlasAPI {
+  updates?: UpdateAPI
   platform: string
   invokeTool: (tool: string, args: Record<string, unknown>) => Promise<Record<string, unknown>>
   captureScreen: () => Promise<string>

@@ -8,6 +8,7 @@ const { registerBackend } = require('./backend.cjs')
 const { registerTasks } = require('./tasks.cjs')
 const { registerMcp } = require('./mcp.cjs')
 const { setNetProxy } = require('./netProxy.cjs')
+const { registerUpdater } = require('./updater.cjs')
 
 /** اسکرین‌شات واقعی از صفحه (در پروسهٔ اصلی؛ sandbox اجازهٔ DOM در preload را نمیدهد) */
 function registerScreenCapture() {
@@ -149,6 +150,7 @@ app.whenReady().then(() => {
   registerScreenCapture()
   registerTasks()
   registerMcp()
+  registerUpdater({ app, ipcMain, BrowserWindow })
   setupTray()
   createWindow()
 })
