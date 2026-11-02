@@ -10,6 +10,7 @@ try {
   await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle' })
   await page.getByRole('heading', { name: 'چطور میتونم کمک کنم؟' }).waitFor()
   await page.evaluate(() => document.fonts.ready)
+  await page.getByText('به هر مدلی وصل میشم و کارها رو انجام میدم', { exact: false }).waitFor()
   await page.screenshot({ path: `${output}/home-dark.png`, animations: 'disabled' })
   await page.keyboard.press('Control+,')
   const dialog = page.getByRole('dialog')
@@ -22,6 +23,9 @@ try {
   await page.screenshot({ path: `${output}/tools-mcp.png`, animations: 'disabled' })
   await tools.getByRole('button', { name: 'بستن', exact: true }).click()
   await page.getByTitle('کاغذی — روشن').click()
+  await page.getByRole('heading', { name: 'چطور میتونم کمک کنم؟' }).evaluate(heading => {
+    heading.closest('.overflow-y-auto').scrollTo({ top: 0, behavior: 'instant' })
+  })
   await page.screenshot({ path: `${output}/home-light.png`, animations: 'disabled' })
   console.log(`Captured four screenshots of the real web UI in ${output}`)
 } finally {
