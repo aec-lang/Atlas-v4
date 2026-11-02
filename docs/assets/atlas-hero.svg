@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="520" viewBox="0 0 1440 520" role="img" aria-labelledby="title description">
+  <title id="title">Atlas — Your models. Your workspace.</title>
+  <desc id="description">A violet orbital illustration beside the Atlas wordmark on a midnight background.</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1"><stop stop-color="#080d21"/><stop offset=".55" stop-color="#151333"/><stop offset="1" stop-color="#101a34"/></linearGradient>
+    <linearGradient id="accent" x2="1" y2="1"><stop stop-color="#93c5fd"/><stop offset=".5" stop-color="#a78bfa"/><stop offset="1" stop-color="#f0abfc"/></linearGradient>
+    <radialGradient id="orb"><stop stop-color="#e0e7ff"/><stop offset=".24" stop-color="#b2a5ff"/><stop offset=".65" stop-color="#7560de"/><stop offset="1" stop-color="#302861"/></radialGradient>
+    <radialGradient id="halo"><stop stop-color="#8b5cf6" stop-opacity=".28"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M44 0H0V44" fill="none" stroke="#c4b5fd" stroke-opacity=".045"/></pattern>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="12"/></filter>
+  </defs>
+  <rect width="1440" height="520" rx="28" fill="url(#background)"/>
+  <rect width="1440" height="520" rx="28" fill="url(#grid)"/>
+  <circle cx="1135" cy="249" r="260" fill="url(#halo)"/>
+  <g fill="#c4b5fd"><circle cx="977" cy="98" r="2"/><circle cx="1312" cy="135" r="2.5"/><circle cx="1002" cy="398" r="2"/><circle cx="1290" cy="385" r="1.5"/><circle cx="141" cy="75" r="1.5"/><circle cx="832" cy="418" r="2"/></g>
+  <g transform="translate(1130 252)">
+    <ellipse rx="210" ry="74" fill="none" stroke="#a78bfa" stroke-opacity=".3" transform="rotate(-26)"/>
+    <ellipse rx="181" ry="96" fill="none" stroke="#93c5fd" stroke-opacity=".18" transform="rotate(42)"/>
+    <circle r="131" fill="#a78bfa" opacity=".12" filter="url(#glow)"/>
+    <circle r="112" fill="url(#orb)"/>
+    <circle r="112" fill="none" stroke="#ddd6fe" stroke-opacity=".4"/>
+    <ellipse rx="83" ry="111" fill="none" stroke="#e0e7ff" stroke-opacity=".2" transform="rotate(31)"/>
+    <ellipse rx="111" ry="39" fill="none" stroke="#e0e7ff" stroke-opacity=".24" transform="rotate(-26)"/>
+    <path d="M-40 46 0-58 40 46M-24 12H24" fill="none" stroke="#faf5ff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity=".94"/>
+    <circle cx="180" cy="-58" r="6" fill="#c4b5fd"/>
+    <circle cx="-147" cy="-92" r="4" fill="#93c5fd"/>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <rect x="88" y="73" width="233" height="32" rx="16" fill="#a78bfa" fill-opacity=".1" stroke="#a78bfa" stroke-opacity=".3"/>
+    <circle cx="108" cy="89" r="4" fill="#a78bfa"/>
+    <text x="123" y="94" fill="#d8ceff" font-size="12" letter-spacing="1.4">PERSIAN AI WORKSPACE</text>
+    <text x="81" y="251" fill="url(#accent)" font-size="142" font-weight="700" letter-spacing="7">ATLAS</text>
+    <text x="89" y="300" fill="#ede9fe" font-size="29" font-weight="600">Your models. Your workspace.</text>
+    <text x="89" y="339" fill="#a7adc6" font-size="18">Local models, cloud APIs and desktop tools — together.</text>
+    <g fill="#c4b5fd" font-size="13" letter-spacing="1.2">
+      <text x="89" y="420">CHAT</text><text x="179" y="420" fill="#505370">/</text>
+      <text x="209" y="420">AGENTS</text><text x="319" y="420" fill="#505370">/</text>
+      <text x="349" y="420">MCP</text><text x="419" y="420" fill="#505370">/</text>
+      <text x="449" y="420">IN-APP UPDATES</text>
+    </g>
+  </g>
+  <rect x=".5" y=".5" width="1439" height="519" rx="27.5" fill="none" stroke="#c4b5fd" stroke-opacity=".13"/>
+</svg>
