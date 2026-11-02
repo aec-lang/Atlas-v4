@@ -1,6 +1,6 @@
 name: Build Linux DEB
 
-# Builds the .deb package for Atlas and attaches it to the existing v4.1.0 release.
+# Builds the .deb package for Atlas and attaches it to the existing v4.2.0 release.
 # Triggered manually only (workflow_dispatch) so pushing this file does not
 # start a full multi-OS build. Mirrors build.yml (Node 22, npm install because
 # package-lock.json is not pushed) plus the maintainer override the .deb
@@ -36,7 +36,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: npx electron-builder --linux deb --config.linux.maintainer="alavi8940-tech" --publish never
 
-      - name: Upload DEB to v4.1.0 release
+      - name: Upload DEB to v4.2.0 release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload v4.1.0 release/*.deb --clobber
+        run: gh release upload v4.2.0 release/*.deb --clobber
