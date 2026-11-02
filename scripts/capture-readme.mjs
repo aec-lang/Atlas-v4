@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises'
-import { chromium } from 'playwright'
+const { chromium } = await import(process.env.ATLAS_PLAYWRIGHT_MODULE || 'playwright')
 
 const output = 'docs/assets/screenshots'
 await mkdir(output, { recursive: true })

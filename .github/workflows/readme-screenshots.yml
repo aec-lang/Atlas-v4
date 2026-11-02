@@ -28,8 +28,8 @@ jobs:
         run: npm run build
       - name: Install screenshot tooling
         run: |
-          npm install --no-save --package-lock=false --ignore-scripts playwright@1.56.1
-          npx playwright install --with-deps chromium
+          npm install --prefix "$RUNNER_TEMP/atlas-readme-tools" --ignore-scripts playwright@1.56.1
+          "$RUNNER_TEMP/atlas-readme-tools/node_modules/.bin/playwright" install --with-deps chromium
       - name: Capture clean UI screenshots
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/atlas-preview.log 2>&1 &
@@ -39,7 +39,7 @@ jobs:
             if curl --silent --fail http://127.0.0.1:4173 > /dev/null; then break; fi
             sleep 1
           done
-          node scripts/capture-readme.mjs
+          ATLAS_PLAYWRIGHT_MODULE="$RUNNER_TEMP/atlas-readme-tools/node_modules/playwright/index.mjs" node scripts/capture-readme.mjs
       - name: Upload screenshot artifact
         uses: actions/upload-artifact@v4
         with:
